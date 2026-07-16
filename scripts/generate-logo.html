@@ -1,0 +1,125 @@
+<!doctype html>
+<!--
+  Logo source for react-anatomy.
+
+  Open in a browser to preview; run `pnpm logo` to export assets/logo.png.
+  Text is plain SVG <text> set in Bricolage Grotesque + JetBrains Mono (Google Fonts) — the export goes
+  through a real browser, so no font embedding or outlining is needed.
+-->
+<html lang="en">
+  <meta charset="utf-8" />
+  <title>react-anatomy logo</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;800&display=swap"
+  />
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 2rem;
+      background: #e6e9e8;
+    }
+    #preview svg {
+      max-width: 100%;
+      height: auto;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+      border-radius: 24px;
+    }
+    #status {
+      color: #5f7280;
+    }
+  </style>
+  <body>
+    <p id="status">Run `pnpm logo` to export assets/logo.png</p>
+    <div id="preview">
+      <!-- palette: deep ink ground, soft-white type, steel structure, one coral accent -->
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 1060 260"
+        width="1060"
+        height="260"
+      >
+        <title>react-anatomy — wordmark with annotated slot</title>
+        <rect width="1060" height="260" fill="#0f1523" rx="24" />
+
+        <!-- mark: bracketed slot with a callout -->
+        <g transform="translate(64,62)">
+          <path
+            d="M 40 8 L 8 8 L 8 136 L 40 136"
+            fill="none"
+            stroke="#7c90b0"
+            stroke-width="11"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M 116 8 L 148 8 L 148 136 L 116 136"
+            fill="none"
+            stroke="#7c90b0"
+            stroke-width="11"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <rect x="48" y="52" width="60" height="40" rx="9" fill="#edf1f7" />
+          <path
+            d="M 78 52 L 78 -18 L 140 -18"
+            fill="none"
+            stroke="#ff6b57"
+            stroke-width="8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <circle cx="78" cy="52" r="10" fill="#ff6b57" />
+          <circle cx="78" cy="52" r="4" fill="#0f1523" />
+        </g>
+
+        <!-- wordmark + tagline, ink-aligned to x=270 by the script below -->
+        <text
+          class="align-left"
+          x="270"
+          y="150"
+          font-family="Bricolage Grotesque"
+          font-size="84"
+          font-weight="800"
+          letter-spacing="-1.5"
+          fill="#edf1f7"
+        >
+          react
+          <tspan fill="#ff6b57">-</tspan>
+          anatomy
+        </text>
+        <text
+          class="align-left"
+          x="270"
+          y="198"
+          font-family="Bricolage Grotesque"
+          font-size="24"
+          font-weight="500"
+          fill="#8291a9"
+        >
+          Beautifully annotate component slots with no effort
+        </text>
+      </svg>
+    </div>
+
+    <script>
+      // Left-align both lines by ink: a glyph's drawn pixels start a little
+      // right of its pen origin (side bearing), and the offset differs per
+      // font size — so nudge each <text> until its ink edge sits at x.
+      // getBBox() reports typographic bounds, so measure ink via canvas.
+      document.fonts.ready.then(async () => {
+        const ctx = document.createElement("canvas").getContext("2d");
+        for (const text of document.querySelectorAll(".align-left")) {
+          const font = `${text.getAttribute("font-weight")} ${text.getAttribute("font-size")}px "${text.getAttribute("font-family")}"`;
+          await document.fonts.load(font);
+          ctx.font = font;
+          const bearing = -ctx.measureText(text.textContent[0])
+            .actualBoundingBoxLeft;
+          text.setAttribute("x", Number(text.getAttribute("x")) - bearing);
+        }
+        document.body.dataset.ready = "true"; // signals the export script
+      });
+    </script>
+  </body>
+</html>

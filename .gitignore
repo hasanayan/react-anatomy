@@ -1,0 +1,9 @@
+node_modules/
+dist/
+storybook-static/
+*.tsbuildinfo
+.DS_Store
+scratchpad/
+# A project-local pnpm store only appears when `pnpm assets:docker` runs the
+# container without an external store; ignore it so it never lands in a commit.
+.pnpm-store/

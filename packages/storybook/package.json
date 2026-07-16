@@ -1,0 +1,48 @@
+{
+  "name": "@react-anatomy/storybook",
+  "version": "0.1.3",
+  "type": "module",
+  "description": "Storybook addon for @react-anatomy/core: a slotAnnotations story parameter that overlays anatomy labels, with the root breadcrumb derived from the story context.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hasanayan/react-anatomy.git",
+    "directory": "packages/storybook"
+  },
+  "homepage": "https://github.com/hasanayan/react-anatomy#readme",
+  "bugs": "https://github.com/hasanayan/react-anatomy/issues",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./preview": {
+      "types": "./dist/preview.d.ts",
+      "import": "./dist/preview.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "peerDependencies": {
+    "@storybook/react-vite": "^10.0.0",
+    "react": "^19.0.0",
+    "storybook": "^10.0.0"
+  },
+  "dependencies": {
+    "@react-anatomy/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@storybook/react-vite": "^10.5.0",
+    "@types/react": "19.2.17",
+    "react": "^19.2.7",
+    "storybook": "^10.5.0"
+  },
+  "sideEffects": false
+}

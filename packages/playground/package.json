@@ -1,0 +1,24 @@
+{
+  "name": "@react-anatomy/playground",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "storybook build",
+    "storybook": "storybook dev -p 6206 --no-open"
+  },
+  "dependencies": {
+    "@react-anatomy/core": "workspace:*",
+    "@react-anatomy/storybook": "workspace:*",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@storybook/react-vite": "10.5.0",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "playwright": "1.61.1",
+    "storybook": "10.5.0",
+    "vite": "8.1.4"
+  }
+}

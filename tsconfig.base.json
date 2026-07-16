@@ -1,0 +1,22 @@
+{
+  // Strict everywhere. Deliberately *not* extending `@tsconfig/node24`: these
+  // packages are DOM/React code, so each leaf tsconfig sets its own browser
+  // `lib` and `types`. Node context (eslint, vitest config) opts into node types
+  // locally.
+  "extends": "@tsconfig/strictest/tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "verbatimModuleSyntax": true,
+    // The overlay code was written against this, and the spec's off-thread split
+    // relies on optional fields round-tripping through structured clone as
+    // `undefined` rather than being forbidden outright.
+    "exactOptionalPropertyTypes": false
+  }
+}
