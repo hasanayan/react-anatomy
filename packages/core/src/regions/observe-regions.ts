@@ -51,9 +51,8 @@ export function observeRegions(
       return;
     }
 
-    // On a settle-only flip the sets are value-equal, so hand back the prior
-    // array: this module owns the dedup, and a stable reference lets callers
-    // rely on identity instead of re-running the comparison themselves.
+    // Settle-only flip: sets are value-equal, so hand back the prior array —
+    // this module owns dedup, and a stable ref lets callers trust identity.
     const regions = changed ? next : (delivered ?? next);
 
     delivered = regions;

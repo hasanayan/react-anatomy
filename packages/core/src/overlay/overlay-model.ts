@@ -59,9 +59,8 @@ export function viewIdentity(view: Region[]): string {
   return view.map((region) => region.id).join("|");
 }
 
-// The zones a navigable overlay may dive into: not the active container, and
-// holding children. The session hands this to the render layer so the component
-// never re-walks the tree it was given.
+// Zones a navigable overlay may dive into: not the active container, with
+// children. Handed to the render layer so it never re-walks the tree.
 export function openablesIn(
   regions: Region[],
   activeId: string | null,
@@ -82,8 +81,8 @@ export function openablesIn(
   return ids;
 }
 
-// Stable colour index per region id, by tree position, so a zone keeps its
-// colour across dives. The palette this indexes is the overlay's presentation.
+// Stable colour index by tree position, so a zone keeps its colour across
+// dives. The palette this indexes is the overlay's presentation.
 export function colourIndex(regions: Region[]): Map<string, number> {
   return new Map(regions.map((region, index) => [region.id, index]));
 }

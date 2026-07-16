@@ -74,9 +74,8 @@ describe("fit", () => {
   });
 });
 
-// The two bounds must agree: the fitted gutter is only ever a tightening of the
-// reserved one, because the solve clamps every label inside the reserved gutter
-// around the frame. If this ever fails, a fitted overlay would crop a label.
+// The fitted gutter is only ever a tightening of the reserved one — the solve
+// clamps every label inside the reserve. If it fails, a fitted overlay crops.
 describe("reserve ≥ fit", () => {
   const sides = ["top", "right", "bottom", "left"] as const;
 

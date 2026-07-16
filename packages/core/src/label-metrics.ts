@@ -1,6 +1,5 @@
-// The Label chip's fixed metrics, and the type its measured size travels in.
-// Kept apart from both the solve (which reserves against the size) and the DOM
-// measurer (which produces it), so neither module owns the other's constant.
+// The Label chip's fixed metrics and the type its measured size travels in,
+// so neither the solve nor the DOM measurer owns the other's constant.
 
 export const labelHeight = 20;
 

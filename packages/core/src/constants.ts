@@ -1,6 +1,5 @@
-// The overlay's single tuning table. The solve reads all of it; the gutter
-// reserve and the zone nudge read one field each — one locus so the numbers a
-// solve, its reserved gutter, and its depth insets share can never diverge.
+// The overlay's single tuning table — one locus so a solve, its reserved
+// gutter, and its depth insets can't drift apart.
 
 export interface Constants {
   gap: number;

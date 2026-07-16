@@ -3,12 +3,9 @@ import type { Point, Rect } from "../geometry";
 import { labelHeight } from "../label-metrics";
 import type { LabelSize } from "../label-metrics";
 
-// The Gutter reserved on each side of the frame, sized so the component never
-// moves. `reserve` is the conservative up-front bound the solve clamps labels
-// into (§4.2); `fit` is the tight post-solve bound the fitted overlay cuts to
-// once it has withheld its reveal. Same concept, two bounds — one module so
-// they can't drift, and `reserve` ≥ `fit` always holds because every label is
-// placed inside the reserved gutter (`gutters.test.ts` pins this).
+// The Gutter reserved each side so the component never moves. `reserve` is the
+// up-front bound the solve clamps into (§4.2); `fit` is the tight post-solve
+// bound. `reserve` ≥ `fit` holds because every label sits inside the reserve.
 
 export interface SidePadding {
   top: number;
@@ -44,9 +41,8 @@ export function reserve(
   };
 }
 
-// Just the label geometry `fit` measures — a structural subset of a Placement,
-// so the gutter never imports the solve's output types (which would cycle back
-// through `place-labels`, which imports `reserve`).
+// A structural subset of a Placement, so the gutter never imports the solve's
+// output types — which would cycle, since `place-labels` imports `reserve`.
 interface FittableLabel {
   labelLeft: number;
   labelTop: number;
@@ -54,10 +50,9 @@ interface FittableLabel {
   points: readonly Point[];
 }
 
-// Fits the gutter to a solved placement. Safe only because the fitted overlay
-// withholds its reveal until this is applied; else the component moves.
-// Overhang is beyond `content` (measurement-root box, not zones' bounds);
-// leader `points` count too, so a fan past its label is never clipped.
+// Fits the gutter to a solved placement — safe only because the fitted overlay
+// withholds its reveal until it applies. Overhang is beyond `content` (the
+// measurement-root box), and leader `points` count, so a fan is never clipped.
 export function fit(
   placement: { labels: readonly FittableLabel[] },
   content: Rect,

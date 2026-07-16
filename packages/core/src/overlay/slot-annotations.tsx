@@ -87,9 +87,9 @@ export function SlotAnnotations({
   const [activeId, setActiveId] = useState<string | null>(null);
   const navigable = depth === undefined;
 
-  // The one place the illegal `fitted` + navigable pairing can still arrive is
-  // loose props; the session's config type makes it unrepresentable past here.
-  // Deduped per instance (a `useRef`, not a module flag) so it stays testable.
+  // Loose props are the only place fitted+navigable can still arrive; the config
+  // type forbids it past here. Per-instance `useRef`, not a module flag, so the
+  // warning stays testable.
   const warnedFitted = useRef(false);
 
   useEffect(() => {
@@ -128,13 +128,10 @@ export function SlotAnnotations({
         },
   );
 
-  // Palette is presentation; the session owns the stable index it maps, so a
-  // zone keeps its colour across dives without the component walking the tree.
+  // Palette is presentation; the session owns the stable index it maps.
   const colorOf = (region: Region): string | undefined =>
     palette[(colorIndexById.get(region.id) ?? 0) % palette.length];
 
-  // The session already knows which zones open: navigable, not the container,
-  // with children. No tree query here.
   const opens = (region: Region): boolean => openableIds.has(region.id);
 
   // Strongest claim wins; hover only reaches in-view frames.

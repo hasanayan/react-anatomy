@@ -31,10 +31,8 @@ interface OverlaySessionBase {
   solver?: Solver;
 }
 
-// A navigable overlay re-solves on every dive, so fitted gutters — which resize
-// to each level — would move the component under the reader; the mode makes that
-// combination unrepresentable rather than coercing it at runtime. A pinned depth
-// (static) is the only mode that may opt into fitted gutters.
+// A navigable overlay re-solves on every dive, so fitted gutters (which resize
+// per level) can't pair with it — the union makes that unrepresentable.
 export type OverlaySessionConfig = OverlaySessionBase &
   (
     | { navigable: true }
@@ -42,14 +40,10 @@ export type OverlaySessionConfig = OverlaySessionBase &
   );
 
 export interface OverlaySession {
-  // Resolved against the current tree; a stale id reads as the root.
-  active: Region | null;
   path: Region[];
-  // Ids the overlay may dive into: navigable, not the active container, with
-  // children. The component asks for the answer, never re-walking the tree.
+  // Dive targets: navigable, not the active container, with children.
   openableIds: Set<string>;
-  // Stable colour index per region id, by tree position, so a zone keeps its
-  // colour across dives. The component owns the palette this indexes into.
+  // Stable colour index by tree position; the component owns the palette.
   colorIndexById: Map<string, number>;
   revealed: boolean;
   padding: SidePadding;
@@ -74,8 +68,7 @@ export function useOverlaySession(
   // rules of hooks.
   const [solveError, setSolveError] = useState<Error | null>(null);
   const [placement, setPlacement] = useState<Placement | null>(null);
-  // The identity of the view the committed placement was solved for; set with
-  // it, so a stale placement is spotted by one equality (§6/§10).
+  // The view the committed placement was solved for; staleness is one equality.
   const [solvedToken, setSolvedToken] = useState<string | null>(null);
   // The box the current placement was solved in; committed with it.
   const [fittedBox, setFittedBox] = useState<Rect | null>(null);
@@ -84,9 +77,8 @@ export function useOverlaySession(
   // Only a static overlay can be fitted; the config forbids the other case.
   const fitted = !config.navigable && config.gutters === "fitted";
 
-  // `observeRegions` owns the dedup: it hands back the same array reference when
-  // nothing changed (including the settle-only delivery that just flips the
-  // flag), so `setRegions` bails on identity with no comparison of our own.
+  // `observeRegions` owns the dedup — same array ref when nothing changed,
+  // including the settle-only flip — so `setRegions` bails on identity.
   useLayoutEffect(() => {
     const root = containerRef.current;
 
@@ -114,9 +106,7 @@ export function useOverlaySession(
   );
   const { active, view, path, drawn, labelRegions, overrides } = composed;
 
-  // Answers the render layer would otherwise re-derive from the whole tree:
-  // a stable colour index by tree position, and the set of dive-able zones.
-  // Both are pure functions of the tree, tested directly in `overlay-model`.
+  // Answers the render layer would else re-derive; pure, tested in overlay-model.
   const colorIndexById = useMemo(() => colourIndex(regions), [regions]);
   const openableIds = useMemo(
     () => openablesIn(regions, active?.id ?? null, navigable),
@@ -197,7 +187,6 @@ export function useOverlaySession(
   });
 
   return {
-    active,
     path,
     openableIds,
     colorIndexById,

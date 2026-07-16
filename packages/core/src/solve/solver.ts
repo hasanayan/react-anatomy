@@ -21,9 +21,8 @@ export interface SolveRequest {
   constants: Constants;
 }
 
-// A transport's reply in native form: a real Error on failure. Only the worker
-// adapter (de)serializes — a throw can't cross `postMessage` — so this interface
-// and every non-worker transport stay in exceptions, never in error-as-data.
+// A transport's reply in native form — a real Error on failure. Only the worker
+// adapter serializes (a throw can't cross `postMessage`); this seam stays native.
 export type SolveReply =
   | { id: number; ok: true; placement: PlacementData }
   | { id: number; ok: false; error: Error };
@@ -119,9 +118,8 @@ export function createSolver(
   };
 }
 
-// Runs the solve on the calling thread; for tests and worker-less hosts. It
-// crosses no boundary, so a throw becomes a real Error reply directly — no
-// serialize/rehydrate round-trip the worker adapter needs.
+// Runs the solve on the calling thread; for tests and worker-less hosts. No
+// boundary crossed, so a throw becomes a native Error reply — never serialized.
 export function createSyncSolver(): Solver {
   return createSolver((onReply) => ({
     post(request: SolveRequest): void {

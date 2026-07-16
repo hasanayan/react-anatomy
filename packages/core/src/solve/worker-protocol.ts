@@ -3,9 +3,8 @@ import type { PlacementData } from "./place-labels";
 import type { SolveReply, SolveRequest } from "./solver";
 
 // The wire format across the worker boundary: a throw can't be structured-
-// cloned, so a failed solve travels as data and is rebuilt into an Error on
-// receipt. Confined to the worker adapter — the sync path never serializes, and
-// the `Solver` interface speaks real exceptions.
+// cloned, so a failure travels as data and is rebuilt on receipt. Confined
+// here — the sync path never serializes.
 
 export type SolveResponse =
   | { id: number; ok: true; placement: PlacementData }

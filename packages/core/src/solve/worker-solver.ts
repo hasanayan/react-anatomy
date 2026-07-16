@@ -8,8 +8,6 @@ import type { SolveResponse } from "./worker-protocol";
 
 // In its own module so nothing else drags the inlined worker blob in. One
 // worker per solver, off-thread so the page stays interactive during a solve.
-// The wire response is rebuilt into a native reply here — the one place a
-// boundary is actually crossed.
 // eslint-disable-next-line import/prefer-default-export -- barrel re-exports this by name
 export function createWorkerSolver(): Solver {
   return createSolver((onReply) => {

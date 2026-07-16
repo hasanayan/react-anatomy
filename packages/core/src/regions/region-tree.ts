@@ -1,17 +1,12 @@
 import type { Region } from "./collect-regions";
 
-// The pure algebra over a collected region tree: identity, parent/child
-// navigation, and the Views cut from it. It makes no DOM *calls* — but a
-// `Region` still carries its `el`, which every function here threads through
-// untouched. The handle is dropped only at `toZones` (solve/zones), where
-// geometry crosses to the solve as pure `Zone` data.
+// The pure algebra over a collected region tree: identity, navigation, and the
+// Views cut from it. Makes no DOM *calls*, but threads each `Region`'s `el`
+// untouched; the handle is dropped only at `toZones` (solve/zones).
 
-// One comparator per `Region` field, typed as a total map over `keyof Region`:
-// adding a field to `Region` fails the build until it is compared here, so the
-// gate can never again fall behind the shape it guards. `el` is identity
-// (navigation holds ids across renders); `radii` is per-corner — the numbers
-// `toZones` forwards to the solve, so a radii-only change (the shorthand
-// `radius` can collapse and miss it) must still count as a change.
+// A total map over `keyof Region`: a new field fails the build until compared
+// here, so the gate can't drift from the shape it guards. `el` compares by
+// identity; `radii` per-corner (the `radius` shorthand collapses and misses it).
 const fieldComparators: {
   [K in keyof Region]-?: (a: Region[K], b: Region[K]) => boolean;
 } = {
