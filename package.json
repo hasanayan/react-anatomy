@@ -1,0 +1,50 @@
+{
+  "name": "react-anatomy",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Deterministic slot-annotation overlay for anatomy docs, and its Storybook addon.",
+  "license": "MIT",
+  "private": true,
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.8.0",
+      "onFail": "download"
+    },
+    "runtime": {
+      "name": "node",
+      "version": "24.18.0",
+      "onFail": "warn"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "build:storybook": "pnpm --filter @react-anatomy/playground build",
+    "lint": "pnpm run lint:check:eslint && pnpm run lint:check:prettier && pnpm run lint:check:knip && pnpm run lint:check:depcheck",
+    "lint:check:depcheck": "depcheck packages/core --ignores=jsdom,vitest,react-dom,@types/react-dom,@types/node && depcheck packages/storybook --ignores=@types/react && depcheck playground --ignores=vite,playwright,@types/react,@types/react-dom,storybook,@storybook/react-vite,@react-anatomy/core",
+    "lint:check:eslint": "eslint . --max-warnings=0",
+    "lint:check:knip": "knip",
+    "lint:check:prettier": "prettier --check .",
+    "storybook": "pnpm --filter @react-anatomy/playground storybook",
+    "test": "vitest run",
+    "typecheck": "tsc --build && tsc -p packages/core/tsconfig.spec.json && tsc -p playground/tsconfig.json"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@tsconfig/strictest": "2.0.8",
+    "@types/node": "24.10.1",
+    "depcheck": "1.4.7",
+    "eslint": "9.39.4",
+    "eslint-config-prettier": "9.1.2",
+    "eslint-plugin-import": "2.32.0",
+    "eslint-plugin-react": "7.37.5",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "15.15.0",
+    "knip": "6.24.0",
+    "prettier": "3.9.4",
+    "prettier-plugin-pkg": "0.22.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.62.1",
+    "vitest": "4.1.9"
+  }
+}

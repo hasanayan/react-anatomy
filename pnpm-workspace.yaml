@@ -1,0 +1,8 @@
+packages:
+  - packages/*
+  - playground
+
+allowBuilds:
+  esbuild: true
+
+saveExact: true

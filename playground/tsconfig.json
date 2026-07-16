@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["src", ".storybook"],
+  "references": [
+    { "path": "../packages/core" },
+    { "path": "../packages/storybook" }
+  ]
+}

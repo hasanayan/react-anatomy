@@ -1,0 +1,38 @@
+{
+  "name": "@react-anatomy/core",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Deterministic anatomy-label placement engine and a Storybook-agnostic React overlay that draws it over any tree marked with data-slot.",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "typecheck:test": "tsc -p tsconfig.spec.json"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "jsdom": "29.1.1",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "vitest": "4.1.9"
+  },
+  "sideEffects": false
+}

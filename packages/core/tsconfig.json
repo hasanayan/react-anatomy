@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+    // The overlay constructs its worker with `new Worker(new URL(...))`. That is
+    // a browser global; pulling in the WebWorker lib as well would redeclare
+    // `self` against the DOM lib, so the worker file leans on the ambient
+    // `self` the DOM lib already provides.
+    "moduleDetection": "force"
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+}

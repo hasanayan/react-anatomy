@@ -1,0 +1,12 @@
+{
+  // Type-checks the tests without emitting: the composite build ships only the
+  // library, so the tests are checked on their own here (and run under vitest).
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": ["src"]
+}
