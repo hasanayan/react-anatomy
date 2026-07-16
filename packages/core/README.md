@@ -43,7 +43,8 @@ ESM**: `dist/place-labels.worker.js` sits next to `dist/slot-annotations.js`,
 and a Vite host resolves the sibling and runs it as a real worker. Keep the
 package out of dependency pre-bundling (`optimizeDeps.exclude`) so the `new URL`
 pattern survives — the playground's `.storybook/main.ts` shows the one line
-needed. `placeZones`/`placeLabels` are also exported for a synchronous solve
-where a worker is unavailable.
+needed. For a host where a worker is unavailable, inject a synchronous solver
+into the overlay's `solver` prop: `createSyncSolver()` runs the same solve on
+the calling thread.
 
 Peer dependencies: `react`, `react-dom` (v19). MIT licensed.

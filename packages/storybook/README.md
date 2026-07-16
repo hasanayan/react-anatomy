@@ -1,7 +1,8 @@
 # @react-anatomy/storybook
 
-A Storybook addon that overlays [`@react-anatomy/core`](../core)'s anatomy
-labels from a story parameter.
+A Storybook addon that overlays
+[`@react-anatomy/core`](https://www.npmjs.com/package/@react-anatomy/core)'s
+anatomy labels from a story parameter.
 
 ## Setup
 

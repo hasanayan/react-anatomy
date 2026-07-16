@@ -5,6 +5,9 @@
     "rootDir": "./src",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": [],
+    // Vite owns the JS bundle (it inlines the worker); tsc only emits the
+    // declarations alongside it.
+    "emitDeclarationOnly": true,
     // The overlay constructs its worker with `new Worker(new URL(...))`. That is
     // a browser global; pulling in the WebWorker lib as well would redeclare
     // `self` against the DOM lib, so the worker file leans on the ambient

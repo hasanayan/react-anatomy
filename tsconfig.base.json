@@ -1,8 +1,8 @@
 {
-  // Strict everywhere, following spitfire. Deliberately *not* extending
-  // `@tsconfig/node24`: these packages are DOM/React code, so each leaf tsconfig
-  // sets its own browser `lib` and `types`. Node context (eslint, vitest config)
-  // opts into node types locally.
+  // Strict everywhere. Deliberately *not* extending `@tsconfig/node24`: these
+  // packages are DOM/React code, so each leaf tsconfig sets its own browser
+  // `lib` and `types`. Node context (eslint, vitest config) opts into node types
+  // locally.
   "extends": "@tsconfig/strictest/tsconfig.json",
   "compilerOptions": {
     "composite": true,

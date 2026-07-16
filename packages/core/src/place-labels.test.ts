@@ -1,24 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import type { Region } from "./collect-regions";
-import type { Constants, Piece, Rect, Zone } from "./place-labels";
+import type { Constants, Overrides, Piece, Rect, Zone } from "./place-labels";
 import {
   anatomyConstants,
   gpav,
   layout,
+  placeZones,
   reservePadding,
-  toZones,
 } from "./place-labels";
+import type { Placement } from "./zones";
+import { attachRegions, toZones } from "./zones";
 
-// The suite the spec (§8) asks for. The load-bearing ones are the optimality
-// check on GPAV — it claims to minimise, not merely to fit — and the invariants
-// the crossing-freedom argument rests on: order preservation and one fan
-// x-interval per side.
+// §8.
 
 const constants: Constants = anatomyConstants;
 
-// A seeded generator, because the point of this file is that the layout is a
-// pure function of its inputs and a flaky test would be self-defeating.
 function random(seed: number): () => number {
   let state = seed;
 
@@ -60,8 +57,7 @@ describe("gpav", () => {
       const solved = gpav(pieces, constants.lambda);
       const mine = objective(pieces, solved, constants.lambda);
 
-      // Dense monotone grid over the whole range in play. A grid can never beat
-      // the true optimum, so an optimal GPAV must come in at or below it.
+      // A grid can never beat the true optimum, so optimal GPAV must be ≤ it.
       const steps = 90;
       const lo = -20;
       const hi = 120;
@@ -108,9 +104,6 @@ describe("gpav", () => {
   });
 
   it("degenerates to PAVA when every segment is a point", () => {
-    // With point segments and an already-sorted chain, the dead zone never
-    // engages and each block sits at the λ-weighted target — i.e. the target
-    // itself, which is what plain PAVA would return.
     const pieces: Piece[] = [10, 20, 30].map((value) => ({
       lo: value,
       hi: value,
@@ -125,8 +118,6 @@ describe("gpav", () => {
   });
 
   it("pools violators to a common value, as PAVA does", () => {
-    // Targets that run backwards must pool: the constraint binds, so both land
-    // on one value between them.
     const pieces: Piece[] = [
       { lo: 100, hi: 100, target: 100 },
       { lo: 0, hi: 0, target: 0 },
@@ -138,7 +129,6 @@ describe("gpav", () => {
   });
 });
 
-// A plain vertical stack, the shape every card anatomy story reduces to.
 function stack(count: number): Zone[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `zone-${i}`,
@@ -220,8 +210,6 @@ describe("layout", () => {
   });
 
   it("draws every fan on a side over one x-interval", () => {
-    // The whole crossing-freedom argument rests on this: same domain, so the
-    // fans are graphs of functions and order cannot flip.
     const placed = run(stack(5)).placed;
 
     for (const side of ["top", "right", "bottom", "left"] as const) {
@@ -296,10 +284,8 @@ describe("layout", () => {
   });
 
   it("lets an end label overhang the frame into a corner", () => {
-    // Rule 11, relaxed. Five 60px labels plus their gaps need 324px of rail and
-    // the frame is only 300 wide, so the old inner-width rail could not seat
-    // this at all — it would have rejected the side outright. The reserved
-    // canvas can, and the end labels pay for it by hanging over the corners.
+    // Rule 11: 5×60px labels + gaps need 324px of rail; frame is 300, so the
+    // ends overhang the corners.
     const zones = stack(5);
     const overrides = Object.fromEntries(
       zones.map((zone) => [zone.id, { side: "top" as const }]),
@@ -320,9 +306,6 @@ describe("layout", () => {
   });
 
   it("keeps every label inside the reserved canvas", () => {
-    // The rail may run into the corners, but not past the padding the component
-    // has already painted into — a label beyond that is a label clipped off the
-    // edge of the diagram.
     const zones = stack(5);
     const padding = reservePadding(sizesFor(zones), constants);
     const frame = frameOf(zones);
@@ -345,10 +328,8 @@ describe("layout", () => {
   });
 
   it("never overlaps two labels across different sides", () => {
-    // Hard rule 4, at the corners specifically. Now that a top label may hang
-    // over a corner it shares x with the left gutter, so the only thing keeping
-    // them apart is the vertical band between the rails. Assert it, rather than
-    // trusting the argument in §2.
+    // Rule 4 at the corners: a top label may overhang a corner and share x with
+    // the left gutter; only the band between the rails keeps them apart.
     const zones = stack(4);
     const placed = run(zones, {
       "zone-0": { side: "top" },
@@ -380,10 +361,8 @@ describe("layout", () => {
   });
 
   it("attaches the leader at the anchor, not at the label's midpoint", () => {
-    // §4.5. The attachment slides along the label's gutter-facing edge to meet
-    // the anchor, staying clear of the chip's corners. Pinned as a property
-    // rather than as a hand-computed number: it has to hold for every leader in
-    // every arrangement, which is what the crossing-freedom argument leans on.
+    // §4.5. The attachment slides along the label's gutter-facing edge to the
+    // anchor, staying clear of the chip's corners.
     const zones = [
       { id: "zone-0", rect: { x: 0, y: 0, w: 300, h: 14 }, depth: 1 },
       { id: "zone-1", rect: { x: 0, y: 14, w: 300, h: 26 }, depth: 1 },
@@ -410,9 +389,6 @@ describe("layout", () => {
   });
 
   it("straightens a leader whose label merely overlaps the edge span", () => {
-    // The payoff of the sliding attachment. These zones are uneven enough that
-    // the labels cannot all sit on their zones' centres, so a midpoint-pinned
-    // attachment would leave leaders angled. Overlap is enough now.
     const zones = [
       { id: "zone-0", rect: { x: 0, y: 0, w: 300, h: 14 }, depth: 1 },
       { id: "zone-1", rect: { x: 0, y: 14, w: 300, h: 26 }, depth: 1 },
@@ -434,10 +410,8 @@ describe("layout", () => {
   });
 
   it("collapses the attachment window for a label thinner than its insets", () => {
-    // The degenerate case, and it is the *narrow* label — not the wide one. A
-    // label wider than its zone's edge is the case that looks alarming and is in
-    // fact fine; only a label thinner than twice the inset leaves no window to
-    // slide in. Unreachable with a real chip, so it is pinned here instead.
+    // Unreachable with a real chip: only a label thinner than twice the inset
+    // leaves no window to slide in.
     const zones = stack(2);
     const sizes = {
       "zone-0": { w: 4, h: 4 },
@@ -455,8 +429,8 @@ describe("layout", () => {
   });
 
   it("gives a shared span to the deeper zone", () => {
-    // The child is flush with its parent's left edge over y 50..150, so on that
-    // line the child wins outright: the parent has to anchor above or below it.
+    // Child flush with the parent's left edge over y 50..150; there it wins, so
+    // the parent must anchor above or below.
     const zones: Zone[] = [
       { id: "parent", rect: { x: 0, y: 0, w: 200, h: 200 }, depth: 1 },
       {
@@ -478,15 +452,13 @@ describe("layout", () => {
     expect(child?.anchor.y).toBeGreaterThanOrEqual(50);
     expect(child?.anchor.y).toBeLessThanOrEqual(150);
 
-    // The parent keeps the line, but only where the child does not cover it.
     const parentY = parent?.anchor.y ?? 0;
 
     expect(parentY < 50 || parentY > 150).toBe(true);
   });
 
   it("throws and names the zone when it has no candidate anywhere", () => {
-    // A wrapper with zero padding: the child covers all four of its lines and,
-    // being deeper, owns every one of them.
+    // Zero-padding wrapper: the deeper child covers and owns all four lines.
     const zones: Zone[] = [
       { id: "wrapper", rect: { x: 0, y: 0, w: 100, h: 100 }, depth: 1 },
       {
@@ -501,9 +473,8 @@ describe("layout", () => {
   });
 
   it("throws and names the layout when nothing survives", () => {
-    // Two 20px-tall zones pinned to the left. Each has a usable edge, so this
-    // is not rule 9 — but two 20px labels plus a gap need 46px of gutter and
-    // the frame only offers 40, so every arrangement overflows.
+    // Not rule 9 (each edge is usable): two 20px labels plus a gap need 46px of
+    // gutter but the frame offers 40, so every arrangement overflows.
     const zones: Zone[] = [
       { id: "zone-0", rect: { x: 0, y: 0, w: 300, h: 20 }, depth: 1 },
       { id: "zone-1", rect: { x: 0, y: 20, w: 300, h: 20 }, depth: 1 },
@@ -524,9 +495,6 @@ describe("layout", () => {
   });
 
   it("reserves a gutter every label fits inside", () => {
-    // The reservation is made before the solve, from the label sizes alone, so
-    // it has to bound whatever the solve then does. Anything it fails to cover
-    // is a label clipped off the edge of the diagram.
     const zones = stack(5);
     const sizes = sizesFor(zones);
     const padding = reservePadding(sizes, constants);
@@ -547,8 +515,6 @@ describe("layout", () => {
   });
 
   it("reserves the same gutter whichever side wins", () => {
-    // Padding must not depend on the assignment — that is the whole reason it
-    // can be computed before the solve.
     const sizes = sizesFor(stack(3));
 
     expect(reservePadding(sizes, constants)).toStrictEqual({
@@ -569,17 +535,12 @@ describe("layout", () => {
   });
 
   it("keeps a navigated level inside the gutter reserved for the whole tree", () => {
-    // What drilling down does to this function: the overlay reserves its
-    // padding once, from every label it could ever show, and then solves one
-    // level at a time — a handful of those zones, with the whole tree's sizes
-    // still in the message. The rails `layout` derives must therefore stay put
-    // as the reader navigates, because the component has already painted into
-    // them and a rail that moved would move the component with it.
+    // Padding is reserved once from every label; solving one level at a time,
+    // with the whole tree's sizes still passed, must not move the rails.
     const tree = stack(8);
     const sizes = {
       ...sizesFor(tree),
-      // The deep zone nobody has dived into yet, with the longest name in the
-      // tree. It is what the padding is for.
+      // The deepest, longest-named zone — what the padding is sized for.
       "zone-deep": { w: 140, h: 20 },
     };
 
@@ -599,9 +560,6 @@ describe("layout", () => {
   });
 
   it("reserves the gutter from every label, not just the ones being placed", () => {
-    // The corollary, stated on its own: a subset's reservation is the tree's
-    // reservation. If this ever stops holding, the first dive into a
-    // long-named slot shifts the diagram under the reader.
     const zones = stack(4);
     const tree = sizesFor(zones);
     const level = sizesFor(zones.slice(1, 3));
@@ -622,9 +580,7 @@ describe("layout", () => {
   });
 });
 
-// §9. The regions here are hand-built rather than measured: jsdom lays nothing
-// out, and the point is the arithmetic on the rects, not where a browser would
-// have put them.
+// §9. Hand-built rects: jsdom lays nothing out; the point is the arithmetic.
 function region(
   name: string,
   depth: number,
@@ -651,8 +607,6 @@ const rectOf = (zones: Zone[], id: string): Rect | undefined =>
 
 describe("toZones", () => {
   it("draws a zone with clearance exactly on its element", () => {
-    // The common case, and the one the old unconditional inset got wrong: a
-    // nested zone with room around it was displaced anyway.
     const zones = toZones(
       [
         region("outer", 1, [0, 0, 200, 100]),
@@ -677,9 +631,6 @@ describe("toZones", () => {
   });
 
   it("steps the container outward and leaves the inner zone alone", () => {
-    // A child flush on the left only. The container gives way there and nowhere
-    // else; the child keeps its geometry, because it is the one with content in
-    // it and the one being pointed at.
     const zones = toZones(
       [
         region("outer", 1, [0, 0, 200, 100]),
@@ -699,9 +650,8 @@ describe("toZones", () => {
   });
 
   it("ignores a shared line the two zones never share a pixel of", () => {
-    // `body`'s left edge sits on the same x as `button-primary`'s, hundreds of
-    // pixels apart. One line, never one border — and rule 2 subtracts nothing
-    // either, because it subtracts spans.
+    // Same x, hundreds of px apart: one line, never one border — and rule 2
+    // subtracts spans, so it subtracts nothing here.
     const zones = toZones(
       [
         region("body", 1, [0, 0, 200, 40]),
@@ -712,13 +662,10 @@ describe("toZones", () => {
     );
 
     expect(rectOf(zones, "body")).toStrictEqual({ x: 0, y: 0, w: 200, h: 40 });
-    // The footer really does share a border with the button, so it gives way.
     expect(rectOf(zones, "footer")?.x).toBe(-1);
   });
 
   it("separates a chain of flush containers in a single pass", () => {
-    // The cascade. Ranks come out 2, 1, 0 and every pair on the line ends up a
-    // pixel apart, with no iteration and nothing to converge.
     const zones = toZones(
       [
         region("a", 1, [0, 0, 200, 100]),
@@ -742,9 +689,8 @@ describe("toZones", () => {
   });
 
   it("never moves same-depth zones for each other", () => {
-    // Two `attribute` slots sharing a top edge are side by side, not nested.
-    // Neither hides the other's border, and §3's tier 1 already prices the
-    // ambiguity.
+    // Two slots sharing a top edge are side by side; neither hides the other's
+    // border, and §3 tier 1 already prices the ambiguity.
     const zones = toZones(
       [region("one", 2, [0, 0, 50, 20]), region("two", 2, [60, 0, 50, 20])],
       constants,
@@ -755,9 +701,6 @@ describe("toZones", () => {
   });
 
   it("keeps the title level labellable, which is what §9 is for", () => {
-    // The exact shape that used to throw: a container with two children flush
-    // on all four of its lines between them. Rule 2 would subtract every span
-    // it has and rule 9 would fire by name.
     const regions = [
       region("title", 1, [0, 0, 100, 40]),
       region("text", 2, [0, 0, 100, 20]),
@@ -773,7 +716,6 @@ describe("toZones", () => {
       ),
     ).not.toThrow();
 
-    // …and it stays labellable by moving the container, not the children.
     const zones = toZones(regions, constants);
 
     expect(rectOf(zones, "text")).toStrictEqual({ x: 0, y: 0, w: 100, h: 20 });
@@ -793,11 +735,7 @@ describe("toZones", () => {
   });
 
   it("throws on the title level with no inset at all, which is why §9 stays", () => {
-    // The inset is conditional now, and that makes it look optional. It is not:
-    // turn it off and this level is unlabellable, exactly as §9 says. Rule 2
-    // hands every one of `title`'s spans to its children and rule 9 fires by
-    // name. Nothing about narrowing the inset to the edges that need it made
-    // this any less true.
+    // Inset off: rule 2 hands `title`'s spans to its children, rule 9 fires.
     const regions = [
       region("title", 1, [0, 0, 100, 40]),
       region("text", 2, [0, 0, 100, 20]),
@@ -822,6 +760,96 @@ describe("toZones", () => {
 
     for (let i = 0; i < 20; i++) {
       expect(JSON.stringify(toZones(regions, constants))).toBe(first);
+    }
+  });
+});
+
+// `attachRegions` re-attaches regions positionally (nth zone = nth region), so
+// `toZones` order must survive to the re-attach. Runs the real
+// `toZones → placeZones → attachRegions` and asserts `region.id == zoneId`.
+
+const labelSizesFor = (
+  set: Region[],
+): Record<string, { w: number; h: number }> =>
+  Object.fromEntries(set.map((item) => [item.id, { w: 48, h: 20 }]));
+
+const pipeline = (set: Region[], overrides: Overrides = {}): Placement =>
+  attachRegions(
+    placeZones(
+      toZones(set, constants),
+      labelSizesFor(set),
+      overrides,
+      constants,
+    ),
+    set,
+  );
+
+describe("the Solve→Placement composition", () => {
+  // Ids deliberately not in geometric order, so a sort keyed on either would
+  // surface as a mismatch.
+  const media = region("media", 1, [0, 0, 120, 40]);
+  const body = region("body", 1, [0, 80, 120, 40]);
+  const footer = region("footer", 1, [0, 160, 120, 40]);
+
+  it("hands every placed item the region whose geometry the solve placed", () => {
+    const permutations: Region[][] = [
+      [media, body, footer],
+      [footer, media, body],
+    ];
+
+    for (const set of permutations) {
+      const placement = pipeline(set);
+
+      expect(placement.frames).toHaveLength(set.length);
+      expect(placement.labels).toHaveLength(set.length);
+
+      for (const label of placement.labels) {
+        expect(label.region.id).toBe(label.zoneId);
+      }
+
+      for (const frame of placement.frames) {
+        expect(frame.region.id).toBe(frame.zoneId);
+      }
+
+      expect(
+        placement.frames.map((frame) => frame.region.id).sort(),
+      ).toStrictEqual(set.map((item) => item.id).sort());
+    }
+  });
+
+  it("mislabels every frame when the regions are re-attached out of order", () => {
+    const set = [media, body, footer];
+    const data = placeZones(
+      toZones(set, constants),
+      labelSizesFor(set),
+      {},
+      constants,
+    );
+
+    const misordered = attachRegions(data, [footer, media, body]);
+
+    expect(
+      misordered.frames.every((frame) => frame.region.id === frame.zoneId),
+    ).toBe(false);
+  });
+
+  it("rides a hidden zone through as a frame with no label, still on its region", () => {
+    const set = [media, body, footer];
+    const placement = pipeline(set, { [body.id]: { hidden: true } });
+
+    expect(placement.labels.map((label) => label.zoneId)).not.toContain(
+      body.id,
+    );
+    expect(placement.frames.map((frame) => frame.zoneId)).toStrictEqual(
+      set.map((item) => item.id),
+    );
+
+    for (const frame of placement.frames) {
+      expect(frame.region.id).toBe(frame.zoneId);
+    }
+
+    for (const label of placement.labels) {
+      expect(label.region.id).toBe(label.zoneId);
     }
   });
 });

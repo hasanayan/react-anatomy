@@ -1,4 +1,6 @@
-# react-anatomy
+<p align="center">
+  <img src="assets/logo.png" alt="react-anatomy — beautifully annotate component slots with no effort" width="640" />
+</p>
 
 A deterministic overlay that labels the anatomy of a component — every part
 marked with a `data-slot` attribute gets a callout in a gutter outside the

@@ -37,7 +37,7 @@ function FullCard(): ReactElement {
         <Icon>◆</Icon>
         <Title>
           <Text>Production policies</Text>
-          <Subtitle>cerbos.dev/production</Subtitle>
+          <Subtitle>example.com/production</Subtitle>
         </Title>
         <Badge>Active</Badge>
       </Heading>
@@ -77,7 +77,7 @@ export const HeadingAnatomy: Story = {
         <Icon>◆</Icon>
         <Title>
           <Text>Production policies</Text>
-          <Subtitle>cerbos.dev/production</Subtitle>
+          <Subtitle>example.com/production</Subtitle>
         </Title>
         <Attribute label="Value">v1.2.0</Attribute>
         <Badge>Active</Badge>

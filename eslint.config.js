@@ -43,9 +43,6 @@ export default tseslint.config(
       ...react.configs.flat.recommended.rules,
       ...react.configs.flat["jsx-runtime"].rules,
       ...reactHooks.configs.recommended.rules,
-      // A single-export module should say so with a default; the moved files
-      // lean on this being enforced (their inline disables would otherwise read
-      // as unused directives).
       "import/prefer-default-export": "error",
       "import/order": [
         "error",

@@ -3,7 +3,7 @@ import type { CSSProperties, ReactElement, ReactNode } from "react";
 // Minimal slotted components, hand-rolled for the playground. The overlay only
 // needs `data-slot` attributes to discover a tree, so these are plain divs with
 // enough styling to render at real sizes and rounded corners — that is all the
-// placement engine reads. No design system, no base-ui: the point is to show the
+// placement engine reads. No component library: the point is to show the
 // overlay working over an arbitrary component, and the smallest such component
 // makes the example easiest to follow.
 
@@ -80,7 +80,7 @@ export function Icon({ children }: { children: ReactNode }): ReactElement {
 
 export function Title({ children }: { children: ReactNode }): ReactElement {
   return slot(
-    "title",
+    "text",
     { display: "flex", flexDirection: "column", gap: 2, flex: "1 1 auto" },
     children,
   );
@@ -88,7 +88,7 @@ export function Title({ children }: { children: ReactNode }): ReactElement {
 
 export function Text({ children }: { children: ReactNode }): ReactElement {
   return slot(
-    "text",
+    "title",
     { fontSize: 14, fontWeight: 600, lineHeight: 1.3 },
     children,
   );

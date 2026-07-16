@@ -5,14 +5,13 @@
   },
   "workspaces": {
     "packages/core": {
-      "entry": ["src/place-labels.worker.ts", "src/**/*.test.ts"],
-      "project": "src/**",
-      "ignoreDependencies": ["react-dom", "@types/react-dom"]
+      "entry": ["src/place-labels.worker.ts", "src/**/*.test.{ts,tsx}"],
+      "project": "src/**"
     },
     "packages/storybook": {
       "project": "src/**"
     },
-    "playground": {
+    "packages/playground": {
       "entry": [".storybook/{main,preview}.ts", "src/**/*.stories.tsx"],
       "project": "src/**",
       "ignoreDependencies": ["@react-anatomy/core", "playwright"]

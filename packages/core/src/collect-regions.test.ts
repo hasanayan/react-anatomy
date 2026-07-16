@@ -12,10 +12,8 @@ import {
   siblingsOf,
 } from "./collect-regions";
 
-// jsdom lays nothing out, so every rect here is zero. That is fine: this file is
-// about the tree, and the tree comes from `data-slot` ancestry rather than from
-// geometry — which is exactly the property §9 needs it to have, since a child
-// inset from its parent and a child flush with it are the same tree.
+// jsdom lays nothing out, so every rect is zero — fine: the tree comes from
+// `data-slot` ancestry, not geometry (the property §9 needs).
 function build(html: string): HTMLElement {
   const root = document.createElement("div");
 
@@ -80,7 +78,6 @@ describe("collectRegions", () => {
   it("counts depth in slots, not in elements", () => {
     const regions = collectRegions(card());
 
-    // `title` sits inside a plain wrapper div. Only the slots count.
     expect(at(regions, "heading").depth).toBe(1);
     expect(at(regions, "title").depth).toBe(2);
     expect(at(regions, "text").depth).toBe(3);
@@ -129,8 +126,6 @@ describe("regionsEqual", () => {
 
     at(before, "body").el.innerHTML = '<div data-slot="chart"></div>';
 
-    // A dive that has just become available is a change, even though every rect
-    // in the collection is untouched.
     expect(regionsEqual(before, collectRegions(root))).toBe(false);
   });
 });
@@ -210,7 +205,6 @@ describe("selectLevel", () => {
       "attribute",
     ]);
 
-    // Grandchildren are a level down. This is a drill-down, not an expansion.
     expect(names(level)).not.toContain("text");
   });
 
@@ -218,8 +212,7 @@ describe("selectLevel", () => {
     const regions = collectRegions(card());
     const level = selectLevel(regions, at(regions, "title").id);
 
-    // `title` is at depth 2 in the tree and `text` at 3, but the view is what
-    // rule 2 and the depth inset are asking about.
+    // Tree depths are 2 and 3; the view is what rule 2 and the inset ask about.
     expect(at(level, "title").depth).toBe(1);
     expect(at(level, "text").depth).toBe(2);
   });
@@ -228,8 +221,6 @@ describe("selectLevel", () => {
     const regions = collectRegions(card());
     const level = selectLevel(regions, at(regions, "title").id);
 
-    // The container's own parent is not in the view, so it is not its parent
-    // here — a tier-2 exemption for a zone nobody drew would be a lie.
     expect(at(level, "title").parentId).toBeUndefined();
     expect(at(level, "text").parentId).toBe(at(regions, "title").id);
   });
@@ -237,7 +228,6 @@ describe("selectLevel", () => {
   it("falls back to the root when the active id names nothing", () => {
     const regions = collectRegions(card());
 
-    // What a story swap leaves behind.
     expect(names(selectLevel(regions, "heading-999"))).toStrictEqual(
       names(selectLevel(regions, null)),
     );
