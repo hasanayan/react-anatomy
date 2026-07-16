@@ -71,6 +71,32 @@ describe("regionsEqual", () => {
 
     expect(regionsEqual(before, collectRegions(root))).toBe(false);
   });
+
+  it("notices a per-corner radius change the shorthand hides", () => {
+    // A corner going square→round is the geometry `toZones` forwards to the
+    // solve; the `radius` shorthand can collapse and read equal, so equality
+    // must compare `radii` or the change is deduped away and never re-solved.
+    const el = document.createElement("div");
+    const base: Region = {
+      name: "slot",
+      id: "slot-0",
+      depth: 1,
+      top: 0,
+      left: 0,
+      width: 10,
+      height: 10,
+      radius: "8px",
+      radii: { topLeft: 8, topRight: 0, bottomLeft: 0, bottomRight: 0 },
+      el,
+    };
+    const rounded: Region = {
+      ...base,
+      radii: { topLeft: 8, topRight: 8, bottomLeft: 0, bottomRight: 0 },
+    };
+
+    expect(regionsEqual([base], [base])).toBe(true);
+    expect(regionsEqual([base], [rounded])).toBe(false);
+  });
 });
 
 describe("the tree", () => {

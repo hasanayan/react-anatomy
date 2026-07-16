@@ -1,13 +1,14 @@
+import { anatomyConstants } from "../constants";
+import type { Constants } from "../constants";
+import type { Zone } from "../geometry";
 import type { Region } from "../regions/collect-regions";
 
 import type {
-  Constants,
   PlacedFrameData,
   PlacedLabelData,
   PlacementData,
-  Zone,
 } from "./place-labels";
-import { anatomyConstants, outwardNudges } from "./place-labels";
+import { outwardNudges } from "./place-labels";
 
 // Worker seam: a `Region`'s `el` can't be structured-cloned across the
 // boundary, so `toZones` strips it; `attachRegions` re-attaches by `id`.

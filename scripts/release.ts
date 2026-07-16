@@ -26,6 +26,14 @@ if (bump !== "major" && bump !== "minor" && bump !== "patch") {
 const git = (...args: string[]): string =>
   execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 
+const branch = git("rev-parse", "--abbrev-ref", "HEAD");
+if (branch !== "main") {
+  console.error(
+    `release must run on main (currently on ${branch}) — release tags publish, so they only live on main`,
+  );
+  process.exit(1);
+}
+
 if (git("status", "--porcelain") !== "") {
   console.error(
     "working tree is dirty — commit or stash first, the release commit must contain only the version bump",
