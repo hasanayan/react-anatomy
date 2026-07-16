@@ -1,0 +1,9 @@
+{
+  // Solution file: no sources of its own, just the build graph. `tsc --build`
+  // walks the references in dependency order.
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/storybook" }
+  ]
+}

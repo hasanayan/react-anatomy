@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "rules": {
+    "types": "off"
+  },
+  "workspaces": {
+    "packages/core": {
+      "entry": ["src/solve/place-labels.worker.ts", "src/**/*.test.{ts,tsx}"],
+      "project": "src/**"
+    },
+    "packages/storybook": {
+      "project": "src/**"
+    },
+    "packages/playground": {
+      "entry": [".storybook/{main,preview}.ts", "src/**/*.stories.tsx"],
+      "project": "src/**",
+      "ignoreDependencies": ["@react-anatomy/core", "playwright"]
+    }
+  }
+}
