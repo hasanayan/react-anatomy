@@ -1,5 +1,5 @@
-import type { LabelSize } from "../solve/place-labels";
-import { labelFont, labelHeight } from "../solve/place-labels";
+import { labelFont, labelHeight } from "../label-metrics";
+import type { LabelSize } from "../label-metrics";
 
 import type { Region } from "./collect-regions";
 

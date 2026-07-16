@@ -1,12 +1,7 @@
 // Reads every `data-slot` in the live DOM into a flat, unfiltered `Region[]`.
 // The tree navigation and view selection over that array live in `region-tree`.
 
-export interface CornerRadii {
-  topLeft: number;
-  topRight: number;
-  bottomLeft: number;
-  bottomRight: number;
-}
+import type { CornerRadii } from "../geometry";
 
 export interface Region {
   name: string;

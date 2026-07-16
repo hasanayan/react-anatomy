@@ -1,18 +1,17 @@
+import { anatomyConstants } from "../constants";
+import type { Constants } from "../constants";
+import type { Rect } from "../geometry";
+import type { LabelSize } from "../label-metrics";
 import type { Region } from "../regions/collect-regions";
 import {
+  hasChildren,
   pathTo,
   selectDepth,
   selectLevel,
   siblingsOf,
 } from "../regions/region-tree";
-import { fitPadding } from "../solve/gutters";
-import type {
-  Constants,
-  LabelSize,
-  Rect,
-  SidePadding,
-} from "../solve/place-labels";
-import { anatomyConstants, reservePadding } from "../solve/place-labels";
+import { fit, reserve } from "../solve/gutters";
+import type { SidePadding } from "../solve/gutters";
 import type { Placement, PlacedFrame, PlacedLabel } from "../solve/zones";
 
 // Framework-free overlay judgement: `composeView` produces the solve's inputs
@@ -43,11 +42,50 @@ interface OverlayInput {
   view: Region[];
   labelSizes: Record<string, LabelSize>;
   placement: Placement | null;
+  // The identity of the view the placement was solved for; null when none. A
+  // newer view whose identity differs withholds the placement — one comparison,
+  // no guessing from a stray label.
+  solvedToken: string | null;
   // The box the current placement was solved in. Null in reserved mode.
   fittedBox: Rect | null;
   fitted: boolean;
   settled: boolean;
   constants?: Constants;
+}
+
+// A view's identity: the ids it labels, in order. A placement is stamped with
+// the identity it was solved for, so staleness is an equality, not a heuristic.
+export function viewIdentity(view: Region[]): string {
+  return view.map((region) => region.id).join("|");
+}
+
+// The zones a navigable overlay may dive into: not the active container, and
+// holding children. The session hands this to the render layer so the component
+// never re-walks the tree it was given.
+export function openablesIn(
+  regions: Region[],
+  activeId: string | null,
+  navigable: boolean,
+): Set<string> {
+  if (!navigable) {
+    return new Set();
+  }
+
+  const ids = new Set<string>();
+
+  for (const region of regions) {
+    if (region.id !== activeId && hasChildren(regions, region.id)) {
+      ids.add(region.id);
+    }
+  }
+
+  return ids;
+}
+
+// Stable colour index per region id, by tree position, so a zone keeps its
+// colour across dives. The palette this indexes is the overlay's presentation.
+export function colourIndex(regions: Region[]): Map<string, number> {
+  return new Map(regions.map((region, index) => [region.id, index]));
 }
 
 interface ResolvedOverlay {
@@ -112,9 +150,9 @@ export function resolveOverlay(input: OverlayInput): ResolvedOverlay {
 
   // Pure function of placement and box, so it lands in the same commit. Null
   // until a placement exists.
-  const reserved = reservePadding(labelSizes, constants);
+  const reserved = reserve(labelSizes, constants);
   const fittedPadding =
-    fitted && placement && fittedBox ? fitPadding(placement, fittedBox) : null;
+    fitted && placement && fittedBox ? fit(placement, fittedBox) : null;
 
   // Fitted reveal is gated on the gutter landing; an empty view has nothing to
   // fit, so it reveals once settled instead of never.
@@ -122,10 +160,10 @@ export function resolveOverlay(input: OverlayInput): ResolvedOverlay {
     !fitted || fittedPadding !== null || (settled && view.length === 0);
   const padding = fitted && fittedPadding ? fittedPadding : reserved;
 
-  // A solve in flight leaves the placement a level behind; keyed on its own
-  // first region so one level's frames never mix with another's dimming.
-  const solved = placement?.labels[0]?.region;
-  const current = solved === undefined || view.includes(solved);
+  // A solve in flight leaves the placement a level behind: its stamped identity
+  // no longer matches this view, so its frames never mix with another's dimming.
+  const current =
+    placement === null || input.solvedToken === viewIdentity(view);
   const labels = current ? (placement?.labels ?? []) : [];
   const frames = current ? (placement?.frames ?? []) : [];
   const labelledIds = new Set(labels.map((label) => label.region.id));

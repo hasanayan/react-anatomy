@@ -39,17 +39,22 @@ export function observeRegions(
     }
   };
 
-  const deliver = (regions: Region[], settled: boolean): void => {
+  const deliver = (next: Region[], settled: boolean): void => {
     if (disposed) {
       return;
     }
 
-    const changed = delivered === null || !regionsEqual(delivered, regions);
+    const changed = delivered === null || !regionsEqual(delivered, next);
 
     // A settle flip is never skipped; every other delivery needs a real change.
     if (!changed && settled === deliveredSettled) {
       return;
     }
+
+    // On a settle-only flip the sets are value-equal, so hand back the prior
+    // array: this module owns the dedup, and a stable reference lets callers
+    // rely on identity instead of re-running the comparison themselves.
+    const regions = changed ? next : (delivered ?? next);
 
     delivered = regions;
     deliveredSettled = settled;

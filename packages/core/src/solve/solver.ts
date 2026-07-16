@@ -1,13 +1,11 @@
+import { anatomyConstants } from "../constants";
+import type { Constants } from "../constants";
+import type { Zone } from "../geometry";
+import type { LabelSize } from "../label-metrics";
 import type { Region } from "../regions/collect-regions";
 
-import type {
-  Constants,
-  LabelSize,
-  Overrides,
-  PlacementData,
-  Zone,
-} from "./place-labels";
-import { anatomyConstants, placeZones } from "./place-labels";
+import type { Overrides, PlacementData } from "./place-labels";
+import { placeZones } from "./place-labels";
 import type { Placement } from "./zones";
 import { attachRegions, toZones } from "./zones";
 
@@ -23,9 +21,12 @@ export interface SolveRequest {
   constants: Constants;
 }
 
-export type SolveResponse =
+// A transport's reply in native form: a real Error on failure. Only the worker
+// adapter (de)serializes — a throw can't cross `postMessage` — so this interface
+// and every non-worker transport stay in exceptions, never in error-as-data.
+export type SolveReply =
   | { id: number; ok: true; placement: PlacementData }
-  | { id: number; ok: false; message: string; stack?: string };
+  | { id: number; ok: false; error: Error };
 
 export interface Solver {
   // Resolves with the placement, or null when superseded or disposed before the
@@ -39,36 +40,11 @@ export interface Solver {
   dispose(): void;
 }
 
-// Ids, staleness and errors are `createSolver`'s, not a transport's.
+// Ids and staleness are `createSolver`'s; a transport just moves requests and
+// replies. Error serialization is the worker adapter's alone, not this seam's.
 export interface SolveTransport {
   post(request: SolveRequest): void;
   dispose(): void;
-}
-
-// A throw cannot cross a worker boundary intact, so failures travel as data
-// here and are rebuilt into an exception by the solver. §9, §10.
-export function answer(request: SolveRequest): SolveResponse {
-  try {
-    return {
-      id: request.id,
-      ok: true,
-      placement: placeZones(
-        request.zones,
-        request.labelSizes,
-        request.overrides,
-        request.constants,
-      ),
-    };
-  } catch (error) {
-    const stack = error instanceof Error ? error.stack : undefined;
-
-    return {
-      id: request.id,
-      ok: false,
-      message: error instanceof Error ? error.message : String(error),
-      ...(stack === undefined ? {} : { stack }),
-    };
-  }
 }
 
 interface Pending {
@@ -81,13 +57,13 @@ interface Pending {
 }
 
 export function createSolver(
-  connect: (onReply: (response: SolveResponse) => void) => SolveTransport,
+  connect: (onReply: (reply: SolveReply) => void) => SolveTransport,
 ): Solver {
   let pending: Pending | null = null;
   let requestId = 0;
   let disposed = false;
 
-  const transport = connect((reply: SolveResponse): void => {
+  const transport = connect((reply: SolveReply): void => {
     if (!pending || reply.id !== pending.id) {
       return;
     }
@@ -99,13 +75,7 @@ export function createSolver(
     if (reply.ok) {
       settled.resolve(attachRegions(reply.placement, settled.regions));
     } else {
-      const error = new Error(reply.message);
-
-      if (reply.stack !== undefined) {
-        error.stack = reply.stack;
-      }
-
-      settled.reject(error);
+      settled.reject(reply.error);
     }
   });
 
@@ -149,11 +119,30 @@ export function createSolver(
   };
 }
 
-// Runs the solve on the calling thread; for tests and worker-less hosts.
+// Runs the solve on the calling thread; for tests and worker-less hosts. It
+// crosses no boundary, so a throw becomes a real Error reply directly — no
+// serialize/rehydrate round-trip the worker adapter needs.
 export function createSyncSolver(): Solver {
   return createSolver((onReply) => ({
     post(request: SolveRequest): void {
-      onReply(answer(request));
+      try {
+        onReply({
+          id: request.id,
+          ok: true,
+          placement: placeZones(
+            request.zones,
+            request.labelSizes,
+            request.overrides,
+            request.constants,
+          ),
+        });
+      } catch (error) {
+        onReply({
+          id: request.id,
+          ok: false,
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
+      }
     },
     dispose(): void {},
   }));

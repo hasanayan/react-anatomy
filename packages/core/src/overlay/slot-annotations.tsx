@@ -1,9 +1,8 @@
 import type { CSSProperties, ReactElement, ReactNode } from "react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { labelFont, labelHeight } from "../label-metrics";
 import type { Region } from "../regions/collect-regions";
-import { hasChildren } from "../regions/region-tree";
-import { labelFont, labelHeight } from "../solve/place-labels";
 import type { Solver } from "../solve/solver";
 
 import { useOverlaySession } from "./overlay-session";
@@ -87,39 +86,56 @@ export function SlotAnnotations({
   const [hovered, setHovered] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const navigable = depth === undefined;
-  const maxDepth = depth === "all" ? Infinity : (depth ?? 1);
+
+  // The one place the illegal `fitted` + navigable pairing can still arrive is
+  // loose props; the session's config type makes it unrepresentable past here.
+  // Deduped per instance (a `useRef`, not a module flag) so it stays testable.
+  const warnedFitted = useRef(false);
+
+  useEffect(() => {
+    if (navigable && gutters === "fitted" && !warnedFitted.current) {
+      warnedFitted.current = true;
+      console.warn(
+        '[anatomy] `gutters: "fitted"` needs a pinned `depth`: a navigable ' +
+          "overlay re-solves on every dive, and fitting the gutters to each " +
+          "level would move the component under the reader. Using reserved " +
+          "gutters.",
+      );
+    }
+  }, [navigable, gutters]);
 
   const {
-    regions,
-    active,
     path,
+    openableIds,
+    colorIndexById,
     revealed,
     padding: appliedPadding,
     labels,
     frames,
     labelledIds,
     deepest,
-  } = useOverlaySession({
-    containerRef: ref,
-    scope,
-    activeId,
-    navigable,
-    maxDepth,
-    gutters,
-    solver,
-  });
+  } = useOverlaySession(
+    depth === undefined
+      ? { containerRef: ref, scope, activeId, solver, navigable: true }
+      : {
+          containerRef: ref,
+          scope,
+          activeId,
+          solver,
+          navigable: false,
+          maxDepth: depth === "all" ? Infinity : depth,
+          gutters,
+        },
+  );
 
-  // Keyed on the tree, not the view: a zone keeps its colour across dives.
-  const colorOf = useMemo(() => {
-    const indices = new Map(regions.map((region, index) => [region.id, index]));
+  // Palette is presentation; the session owns the stable index it maps, so a
+  // zone keeps its colour across dives without the component walking the tree.
+  const colorOf = (region: Region): string | undefined =>
+    palette[(colorIndexById.get(region.id) ?? 0) % palette.length];
 
-    return (region: Region): string | undefined =>
-      palette[(indices.get(region.id) ?? 0) % palette.length];
-  }, [regions]);
-
-  // Asked of the tree: the view has thrown away the levels this is about.
-  const opens = (region: Region): boolean =>
-    navigable && region.id !== active?.id && hasChildren(regions, region.id);
+  // The session already knows which zones open: navigable, not the container,
+  // with children. No tree query here.
+  const opens = (region: Region): boolean => openableIds.has(region.id);
 
   // Strongest claim wins; hover only reaches in-view frames.
   const frameOpacity = (region: Region, inView: boolean): number => {

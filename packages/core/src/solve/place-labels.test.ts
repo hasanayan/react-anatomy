@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { anatomyConstants } from "../constants";
+import type { Constants } from "../constants";
+import type { Rect, Zone } from "../geometry";
 import type { Region } from "../regions/collect-regions";
 
-import type { Constants, Overrides, Piece, Rect, Zone } from "./place-labels";
-import {
-  anatomyConstants,
-  gpav,
-  layout,
-  placeZones,
-  reservePadding,
-} from "./place-labels";
+import { reserve } from "./gutters";
+import type { Overrides, Piece } from "./place-labels";
+import { gpav, layout, placeZones } from "./place-labels";
 import type { Placement } from "./zones";
 import { attachRegions, toZones } from "./zones";
 
@@ -308,7 +306,7 @@ describe("layout", () => {
 
   it("keeps every label inside the reserved canvas", () => {
     const zones = stack(5);
-    const padding = reservePadding(sizesFor(zones), constants);
+    const padding = reserve(sizesFor(zones), constants);
     const frame = frameOf(zones);
 
     for (const side of ["top", "bottom"] as const) {
@@ -498,7 +496,7 @@ describe("layout", () => {
   it("reserves a gutter every label fits inside", () => {
     const zones = stack(5);
     const sizes = sizesFor(zones);
-    const padding = reservePadding(sizes, constants);
+    const padding = reserve(sizes, constants);
     const frame = frameOf(zones);
     const placed = run(zones).placed;
 
@@ -518,7 +516,7 @@ describe("layout", () => {
   it("reserves the same gutter whichever side wins", () => {
     const sizes = sizesFor(stack(3));
 
-    expect(reservePadding(sizes, constants)).toStrictEqual({
+    expect(reserve(sizes, constants)).toStrictEqual({
       top: constants.sideGap + 20,
       right: constants.sideGap + 60,
       bottom: constants.sideGap + 20,
@@ -527,7 +525,7 @@ describe("layout", () => {
   });
 
   it("reserves nothing when there is nothing to label", () => {
-    expect(reservePadding({}, constants)).toStrictEqual({
+    expect(reserve({}, constants)).toStrictEqual({
       top: 0,
       right: 0,
       bottom: 0,
@@ -545,7 +543,7 @@ describe("layout", () => {
       "zone-deep": { w: 140, h: 20 },
     };
 
-    const padding = reservePadding(sizes, constants);
+    const padding = reserve(sizes, constants);
 
     for (const level of [tree.slice(0, 2), tree.slice(3, 6), tree]) {
       const frame = frameOf(level);
@@ -565,9 +563,7 @@ describe("layout", () => {
     const tree = sizesFor(zones);
     const level = sizesFor(zones.slice(1, 3));
 
-    expect(reservePadding(level, constants)).toStrictEqual(
-      reservePadding(tree, constants),
-    );
+    expect(reserve(level, constants)).toStrictEqual(reserve(tree, constants));
   });
 
   it("skips a hidden zone but still routes around it", () => {

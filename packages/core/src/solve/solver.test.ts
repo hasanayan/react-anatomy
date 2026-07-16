@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 
+import { anatomyConstants } from "../constants";
+import type { Constants } from "../constants";
+import type { LabelSize } from "../label-metrics";
 import type { Region } from "../regions/collect-regions";
 
-import type { Constants, LabelSize } from "./place-labels";
-import { anatomyConstants, placeZones } from "./place-labels";
-import type { SolveRequest, SolveResponse, Solver } from "./solver";
-import { answer, createSolver, createSyncSolver } from "./solver";
+import { placeZones } from "./place-labels";
+import { createSolver, createSyncSolver } from "./solver";
+import type { SolveReply, SolveRequest, Solver } from "./solver";
+import { reviveResponse, serializeResponse } from "./worker-protocol";
+import type { SolveResponse } from "./worker-protocol";
 import { attachRegions, toZones } from "./zones";
 
 const region = (name: string, index: number, top: number): Region => ({
@@ -32,11 +36,11 @@ const sizesFor = (set: Region[]): Record<string, LabelSize> =>
 function harness(): {
   solver: Solver;
   posted: SolveRequest[];
-  reply: (response: SolveResponse) => void;
+  reply: (reply: SolveReply) => void;
   disposals: () => number;
 } {
   const posted: SolveRequest[] = [];
-  let deliver: (response: SolveResponse) => void = () => {};
+  let deliver: (reply: SolveReply) => void = () => {};
   let disposed = 0;
 
   const solver = createSolver((onReply) => {
@@ -62,6 +66,18 @@ function harness(): {
   };
 }
 
+// The native reply a transport hands back for a successful solve.
+const nativeReply = (request: SolveRequest): SolveReply => ({
+  id: request.id,
+  ok: true,
+  placement: placeZones(
+    request.zones,
+    request.labelSizes,
+    request.overrides,
+    request.constants,
+  ),
+});
+
 describe("latest-wins", () => {
   it("resolves a superseded solve to null and paints only the newest", async () => {
     const { solver, posted, reply } = harness();
@@ -83,7 +99,7 @@ describe("latest-wins", () => {
       throw new Error("third request was not posted");
     }
 
-    reply(answer(request));
+    reply(nativeReply(request));
 
     const placement = await third;
 
@@ -107,10 +123,10 @@ describe("latest-wins", () => {
       throw new Error("requests were not posted");
     }
 
-    reply(answer(stale));
+    reply(nativeReply(stale));
     await expect(first).resolves.toBeNull();
 
-    reply(answer(current));
+    reply(nativeReply(current));
     await expect(second).resolves.not.toBeNull();
   });
 
@@ -131,7 +147,7 @@ describe("latest-wins", () => {
 });
 
 describe("error rehydration", () => {
-  it("rejects with a real Error carrying the transported message and stack", async () => {
+  it("rejects with the Error a transport reports, untouched", async () => {
     const { solver, posted, reply } = harness();
     const set = regions();
 
@@ -142,17 +158,15 @@ describe("error rehydration", () => {
       throw new Error("request was not posted");
     }
 
-    reply({
-      id: request.id,
-      ok: false,
-      message: '[anatomy] zone "media-0" has no candidate segments',
-      stack: "Error: staged stack",
-    });
+    // The transport hands back a real Error (the worker adapter rebuilds it from
+    // the wire); the solver just rejects with it.
+    const failure = new Error(
+      '[anatomy] zone "media-0" has no candidate segments',
+    );
 
-    await expect(solve).rejects.toMatchObject({
-      message: '[anatomy] zone "media-0" has no candidate segments',
-      stack: "Error: staged stack",
-    });
+    reply({ id: request.id, ok: false, error: failure });
+
+    await expect(solve).rejects.toBe(failure);
   });
 
   it("rejects identically from the synchronous adapter when a hard rule fires", async () => {
@@ -185,7 +199,11 @@ function cloningHarness(mangle: (response: SolveResponse) => SolveResponse): {
       // is here to prevent.
       const crossed = structuredClone(request);
 
-      onReply(structuredClone(mangle(answer(crossed))));
+      // Serialize on the worker side, clone across, revive on the main side —
+      // exactly the worker adapter's path, checked without spinning a `Worker`.
+      const wire = structuredClone(mangle(serializeResponse(crossed)));
+
+      onReply(reviveResponse(wire));
     },
     dispose(): void {},
   }));

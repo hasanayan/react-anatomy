@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
 
+import type { Rect } from "../geometry";
+import type { LabelSize } from "../label-metrics";
 import type { Region } from "../regions/collect-regions";
-import type { LabelSize, Rect } from "../solve/place-labels";
 import type { Placement, PlacedLabel } from "../solve/zones";
 
-import { composeView, resolveOverlay } from "./overlay-model";
+import {
+  colourIndex,
+  composeView,
+  openablesIn,
+  resolveOverlay,
+  viewIdentity,
+} from "./overlay-model";
 
 // `composeView`/`resolveOverlay` at their interface — regions and a placement
 // in, drawable state out — no DOM, no React.
@@ -161,13 +168,15 @@ describe("resolveOverlay", () => {
   const view = [region({ name: "card", id: "card-0" })];
 
   it("withholds a stale placement and draws nothing incoherent", () => {
-    // Placement's first region is not in the current view: withheld whole.
-    const stale = placementOf([region({ name: "other", id: "other-9" })]);
+    // Placement was solved for a different view: its identity no longer matches.
+    const other = [region({ name: "other", id: "other-9" })];
+    const stale = placementOf(other);
 
     const overlay = resolveOverlay({
       view,
       labelSizes: sizes(view),
       placement: stale,
+      solvedToken: viewIdentity(other),
       fittedBox: null,
       fitted: false,
       settled: true,
@@ -186,6 +195,7 @@ describe("resolveOverlay", () => {
       view,
       labelSizes: sizes(view),
       placement,
+      solvedToken: viewIdentity(view),
       fittedBox: null,
       fitted: false,
       settled: true,
@@ -209,6 +219,7 @@ describe("resolveOverlay", () => {
       view,
       labelSizes: sizes(view),
       placement,
+      solvedToken: viewIdentity(view),
       fittedBox: null,
       fitted: false,
       settled: true,
@@ -226,6 +237,7 @@ describe("resolveOverlay", () => {
       view,
       labelSizes: sizes(view),
       placement: null,
+      solvedToken: null,
       fittedBox: null,
       fitted: false,
       settled: false,
@@ -241,6 +253,7 @@ describe("resolveOverlay", () => {
       view,
       labelSizes: sizes(view),
       placement: null,
+      solvedToken: null,
       fittedBox: null,
       fitted: true,
       settled: true,
@@ -254,6 +267,7 @@ describe("resolveOverlay", () => {
       view,
       labelSizes: sizes(view),
       placement: placementOf(view),
+      solvedToken: viewIdentity(view),
       fittedBox: box,
       fitted: true,
       settled: true,
@@ -270,6 +284,7 @@ describe("resolveOverlay", () => {
       view: [],
       labelSizes: {},
       placement: null,
+      solvedToken: null,
       fittedBox: null,
       fitted: true,
       settled: true,
@@ -283,11 +298,44 @@ describe("resolveOverlay", () => {
       view: [],
       labelSizes: {},
       placement: null,
+      solvedToken: null,
       fittedBox: null,
       fitted: true,
       settled: false,
     });
 
     expect(overlay.revealed).toBe(false);
+  });
+});
+
+describe("openablesIn", () => {
+  it("names the zones with children, skipping leaves", () => {
+    // `card` (header + body) and `body` (avatar) open; the leaves do not.
+    expect(openablesIn(tree, null, true)).toStrictEqual(
+      new Set(["card-0", "body-2"]),
+    );
+  });
+
+  it("never offers to dive into the active container", () => {
+    expect(openablesIn(tree, "card-0", true)).toStrictEqual(
+      new Set(["body-2"]),
+    );
+  });
+
+  it("opens nothing in a static overlay", () => {
+    expect(openablesIn(tree, null, false)).toStrictEqual(new Set());
+  });
+});
+
+describe("colourIndex", () => {
+  it("indexes by tree position so a zone's colour is stable across dives", () => {
+    expect(colourIndex(tree)).toStrictEqual(
+      new Map([
+        ["card-0", 0],
+        ["header-1", 1],
+        ["body-2", 2],
+        ["avatar-3", 3],
+      ]),
+    );
   });
 });
