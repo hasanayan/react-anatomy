@@ -1,6 +1,6 @@
 {
   "name": "@react-anatomy/core",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "description": "Deterministic anatomy-label placement engine and a Storybook-agnostic React overlay that draws it over any tree marked with data-slot.",
   "repository": {
