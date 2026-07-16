@@ -1,39 +1,50 @@
 import type { RefObject } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import type { Rect } from "../geometry";
 import type { Region } from "../regions/collect-regions";
 import { measureLabelSizes } from "../regions/measure-labels";
 import { observeRegions } from "../regions/observe-regions";
-import { regionsEqual } from "../regions/region-tree";
-import type { Rect, SidePadding } from "../solve/place-labels";
+import type { SidePadding } from "../solve/gutters";
 import type { Solver } from "../solve/solver";
 import { createWorkerSolver } from "../solve/worker-solver";
 import type { Placement, PlacedFrame, PlacedLabel } from "../solve/zones";
 
-import { composeView, resolveOverlay } from "./overlay-model";
+import {
+  colourIndex,
+  composeView,
+  openablesIn,
+  resolveOverlay,
+  viewIdentity,
+} from "./overlay-model";
 
 // The measure→solve→resolve choreography behind one hook: the component asks
 // for a session and paints what it returns, never touching the solve's argument
 // shape, the fitted box, or the solver's lifetime.
 
-export interface OverlaySessionConfig {
+interface OverlaySessionBase {
   // The measurement root; label sizes and the fitted box are read off it.
   containerRef: RefObject<HTMLDivElement | null>;
   scope?: string;
   activeId: string | null;
-  navigable: boolean;
-  maxDepth: number;
-  gutters: "reserved" | "fitted";
   // Injected solvers are not disposed here; the default worker is.
   solver?: Solver;
 }
 
+// A navigable overlay re-solves on every dive, so fitted gutters (which resize
+// per level) can't pair with it — the union makes that unrepresentable.
+export type OverlaySessionConfig = OverlaySessionBase &
+  (
+    | { navigable: true }
+    | { navigable: false; maxDepth: number; gutters: "reserved" | "fitted" }
+  );
+
 export interface OverlaySession {
-  // The whole tree, for colour and dive-target lookups the view has discarded.
-  regions: Region[];
-  // Resolved against the current tree; a stale id reads as the root.
-  active: Region | null;
   path: Region[];
+  // Dive targets: navigable, not the active container, with children.
+  openableIds: Set<string>;
+  // Stable colour index by tree position; the component owns the palette.
+  colorIndexById: Map<string, number>;
   revealed: boolean;
   padding: SidePadding;
   labels: PlacedLabel[];
@@ -42,21 +53,13 @@ export interface OverlaySession {
   deepest: number;
 }
 
-// Dev warning said once per process, not per overlay.
-let warnedFittedNavigable = false;
-
 export function useOverlaySession(
   config: OverlaySessionConfig,
 ): OverlaySession {
-  const {
-    containerRef,
-    scope,
-    activeId,
-    navigable,
-    maxDepth,
-    gutters,
-    solver,
-  } = config;
+  const { containerRef, scope, activeId, solver } = config;
+  const navigable = config.navigable;
+  // A navigable overlay ignores `maxDepth` (it selects a level, not a depth).
+  const maxDepth = config.navigable ? Infinity : config.maxDepth;
 
   // A ref, not state: swapping solvers must not repaint.
   const solverRef = useRef<Solver | null>(null);
@@ -65,16 +68,17 @@ export function useOverlaySession(
   // rules of hooks.
   const [solveError, setSolveError] = useState<Error | null>(null);
   const [placement, setPlacement] = useState<Placement | null>(null);
+  // The view the committed placement was solved for; staleness is one equality.
+  const [solvedToken, setSolvedToken] = useState<string | null>(null);
   // The box the current placement was solved in; committed with it.
   const [fittedBox, setFittedBox] = useState<Rect | null>(null);
   const [settled, setSettled] = useState(false);
 
-  // Fitted needs a pinned depth: navigable re-solves per level and would resize
-  // the padding under the reader on every dive.
-  const fitted = gutters === "fitted" && !navigable;
+  // Only a static overlay can be fitted; the config forbids the other case.
+  const fitted = !config.navigable && config.gutters === "fitted";
 
-  // `regionsEqual` holds identity across the settle delivery, which repeats the
-  // same regions only to flip `settled`.
+  // `observeRegions` owns the dedup — same array ref when nothing changed,
+  // including the settle-only flip — so `setRegions` bails on identity.
   useLayoutEffect(() => {
     const root = containerRef.current;
 
@@ -85,7 +89,7 @@ export function useOverlaySession(
     return observeRegions(root, {
       ...(scope === undefined ? {} : { scope }),
       onChange: (next: Region[], isSettled: boolean): void => {
-        setRegions((current) => (regionsEqual(current, next) ? current : next));
+        setRegions(next);
 
         if (isSettled) {
           setSettled(true);
@@ -94,18 +98,6 @@ export function useOverlaySession(
     });
   }, [containerRef, scope]);
 
-  useEffect(() => {
-    if (gutters === "fitted" && navigable && !warnedFittedNavigable) {
-      warnedFittedNavigable = true;
-      console.warn(
-        '[anatomy] `gutters: "fitted"` needs a pinned `depth`: a navigable ' +
-          "overlay re-solves on every dive, and fitting the gutters to each " +
-          "level would move the component under the reader. Falling back to " +
-          "reserved gutters.",
-      );
-    }
-  }, [gutters, navigable]);
-
   // Memoised on the tree, clear of any placement, so the solve effect never
   // re-fires on its own answer.
   const composed = useMemo(
@@ -113,6 +105,13 @@ export function useOverlaySession(
     [regions, activeId, navigable, maxDepth],
   );
   const { active, view, path, drawn, labelRegions, overrides } = composed;
+
+  // Answers the render layer would else re-derive; pure, tested in overlay-model.
+  const colorIndexById = useMemo(() => colourIndex(regions), [regions]);
+  const openableIds = useMemo(
+    () => openablesIn(regions, active?.id ?? null, navigable),
+    [regions, active, navigable],
+  );
 
   // The one model input that touches the DOM, so it lives here not in
   // `resolveOverlay`. Over every label the overlay could show.
@@ -153,10 +152,13 @@ export function useOverlaySession(
         ? { x: 0, y: 0, w: root.offsetWidth, h: root.offsetHeight }
         : null;
 
+    const token = viewIdentity(view);
+
     void instance.solve(drawn, labelSizes, overrides).then((next) => {
       if (next) {
         setPlacement(next);
         setFittedBox(box);
+        setSolvedToken(token);
       }
     }, setSolveError);
   }, [
@@ -178,15 +180,16 @@ export function useOverlaySession(
     view,
     labelSizes,
     placement,
+    solvedToken,
     fittedBox,
     fitted,
     settled,
   });
 
   return {
-    regions,
-    active,
     path,
+    openableIds,
+    colorIndexById,
     revealed: overlay.revealed,
     padding: overlay.padding,
     labels: overlay.labels,

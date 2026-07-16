@@ -1,5 +1,5 @@
 # Publishes @react-anatomy/core and @react-anatomy/storybook to npm when a
-# v* tag is pushed (tags are created by `pnpm release`, see scripts/release.mjs).
+# v* tag on a commit contained in main is pushed (tags come from `pnpm release`).
 # Needs the NPM_TOKEN repository secret; id-token gives npm provenance.
 name: Release
 
@@ -17,6 +17,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tag is on main
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "tag $GITHUB_REF_NAME ($GITHUB_SHA) is not on main; refusing to release"
+            exit 1
+          fi
 
       - uses: pnpm/action-setup@v4
         with:
@@ -41,7 +51,6 @@ jobs:
       - name: Check tag matches package versions
         run: node scripts/check-release-tag.ts "$GITHUB_REF_NAME"
 
-      - run: pnpm -r publish --access public --no-git-checks
+      - run: pnpm -r stage publish --access public --no-git-checks
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"

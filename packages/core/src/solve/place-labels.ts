@@ -1,7 +1,14 @@
 // Deterministic placement of anatomy callout labels around a component.
 // Implements anatomy-labelling-spec.md; § refs below point into it.
 
-export type Side = "top" | "right" | "bottom" | "left";
+import { anatomyConstants } from "../constants";
+import type { Constants } from "../constants";
+import type { Point, Rect, Side, Zone } from "../geometry";
+import { labelHeight } from "../label-metrics";
+import type { LabelSize } from "../label-metrics";
+
+import { reserve } from "./gutters";
+import type { SidePadding } from "./gutters";
 
 // Order is load-bearing: search bitmasks index into it (§6).
 const sides: Side[] = ["top", "right", "bottom", "left"];
@@ -18,62 +25,6 @@ function sideAt(index: number): Side {
   return side;
 }
 
-export const labelHeight = 20;
-
-// Must match the offscreen measurer's font, else reserved width won't match the
-// box. Var may resolve to a late web font; `whenLabelFontReady` gates measure.
-export const labelFont =
-  "600 10px/1.5 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)";
-
-export interface Constants {
-  gap: number;
-  minRun: number;
-  stubCap: number;
-  depthInset: number;
-  sideGap: number;
-  attachInset: number;
-  alpha: number;
-  // Strict-convexity term, not an epsilon: a flat dead-zone optimum is a set,
-  // not a point, so the snapshot flakes. §4.2.
-  lambda: number;
-  weights: { residual: number; length: number; imbalance: number };
-}
-
-export const anatomyConstants: Constants = {
-  gap: 6,
-  minRun: 8,
-  stubCap: 2,
-  depthInset: 1,
-  sideGap: 28,
-  // Chip corner radius is 3, so 4 clears it by a pixel.
-  attachInset: 4,
-  alpha: 1,
-  lambda: 3,
-  weights: { residual: 1, length: 0.01, imbalance: 20 },
-};
-
-export interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-export interface CornerRadii {
-  topLeft: number;
-  topRight: number;
-  bottomLeft: number;
-  bottomRight: number;
-}
-
-export interface Zone {
-  id: string;
-  rect: Rect;
-  depth: number;
-  parentId?: string;
-  radii?: CornerRadii;
-}
-
 export type Overrides = Record<
   string,
   {
@@ -82,11 +33,6 @@ export type Overrides = Record<
     hidden?: boolean;
   }
 >;
-
-export interface LabelSize {
-  w: number;
-  h: number;
-}
 
 interface Span {
   lo: number;
@@ -98,11 +44,6 @@ interface Candidate {
   side: Side;
   span: Span;
   ambiguous: boolean;
-}
-
-export interface Point {
-  x: number;
-  y: number;
 }
 
 export interface Placed {
@@ -998,7 +939,7 @@ export function layout(
     ancestors,
     frame,
     // Rail and padding must agree exactly, or labels land in uncleared space.
-    padding: reservePadding(labelSizes, constants),
+    padding: reserve(labelSizes, constants),
     sizes: labelSizes,
     constants,
     overrides,
@@ -1117,40 +1058,6 @@ export interface PlacementData {
   // Rects to draw: regions pulled in by the depth inset, so a label points at
   // the border the reader sees.
   frames: PlacedFrameData[];
-}
-
-export interface SidePadding {
-  top: number;
-  right: number;
-  bottom: number;
-  left: number;
-}
-
-// Gutter per side, an *input* to §4.2's clamp, not read back off its output, so
-// padding is final before paint. Pass the whole tree's labels for a navigable
-// overlay, so the bound doesn't change as the reader moves (§10).
-export function reservePadding(
-  labelSizes: Record<string, LabelSize>,
-  constants: Constants,
-): SidePadding {
-  const sizes = Object.values(labelSizes);
-
-  if (sizes.length === 0) {
-    return { top: 0, right: 0, bottom: 0, left: 0 };
-  }
-
-  const widest = Math.max(...sizes.map((size) => size.w));
-  const tallest = Math.max(...sizes.map((size) => size.h));
-
-  const horizontal = Math.ceil(constants.sideGap + widest);
-  const vertical = Math.ceil(constants.sideGap + tallest);
-
-  return {
-    top: vertical,
-    right: horizontal,
-    bottom: vertical,
-    left: horizontal,
-  };
 }
 
 // Rounding happens only here (§6): the solve stays in reals so two runs agree

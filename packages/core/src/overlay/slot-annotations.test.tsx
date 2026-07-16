@@ -4,9 +4,9 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fitPadding } from "../solve/gutters";
+import { labelHeight } from "../label-metrics";
+import { fit } from "../solve/gutters";
 import type { Overrides } from "../solve/place-labels";
-import { labelHeight } from "../solve/place-labels";
 import type { Solver } from "../solve/solver";
 import { createSyncSolver } from "../solve/solver";
 import type { Placement } from "../solve/zones";
@@ -362,7 +362,7 @@ describe("SlotAnnotations session", () => {
       throw new Error("the fitted solve did not resolve a placement");
     }
 
-    const expected = fitPadding(placement, { x: 0, y: 0, w: 0, h: 0 });
+    const expected = fit(placement, { x: 0, y: 0, w: 0, h: 0 });
     const padded = wrapper.firstElementChild;
 
     if (!(padded instanceof HTMLElement)) {
@@ -376,5 +376,33 @@ describe("SlotAnnotations session", () => {
     expect(padded.style.paddingBottom).toBe(asPx(expected.bottom));
     expect(padded.style.paddingLeft).toBe(asPx(expected.left));
     expect(expected.left).toBeGreaterThan(0);
+  });
+
+  it("warns once when a navigable overlay asks for fitted gutters", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // No `depth` (navigable) + fitted is the illegal pairing: the config makes
+    // it unrepresentable, so the boundary warns and falls back to reserved.
+    const { container } = await render(
+      <SlotAnnotations solver={createSyncSolver()} gutters="fitted">
+        {card()}
+      </SlotAnnotations>,
+    );
+
+    await settle();
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toContain('gutters: "fitted"');
+
+    // Reserved fallback reveals from the first paint, never withheld for a fit.
+    const wrapper = container.firstElementChild;
+
+    if (!(wrapper instanceof HTMLElement)) {
+      throw new Error("the overlay wrapper was not rendered");
+    }
+
+    expect(wrapper.style.visibility).toBe("");
+
+    warn.mockRestore();
   });
 });

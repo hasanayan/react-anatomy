@@ -1,8 +1,12 @@
 // Regenerates the README assets from the playground stories: the three static
-// diagram PNGs and the animated "deep dive" GIF. It builds the playground into
-// a static Storybook, serves it, drives the overlay with a headless browser,
-// and encodes the frames — so the images can never drift from what the addon
-// actually renders. Run with `pnpm assets`.
+// diagram PNGs and the "deep dive" drill-down GIF. It builds the playground into
+// a static Storybook, serves it, drives the overlay with a headless browser, and
+// encodes the frames — so the images can never drift from what the addon renders.
+//
+// The output is byte-deterministic (see `settle`), which is what lets CI gate on
+// an unchanged working tree. But those bytes depend on the font stack and browser
+// build, so a local `pnpm assets` on macOS will NOT match CI's Linux bytes — use
+// `pnpm assets:docker` to regenerate in the same container CI runs.
 //
 // GIF encoding is pure JS (gifenc + pngjs) on purpose: no ffmpeg, no native
 // build step, so the script runs anywhere the repo already installs.
@@ -15,6 +19,7 @@ import { fileURLToPath } from "node:url";
 
 import gifenc from "gifenc";
 import { chromium } from "playwright";
+import type { Browser, Locator, Page } from "playwright";
 import { PNG } from "pngjs";
 
 const { applyPalette, GIFEncoder, quantize } = gifenc;
@@ -61,17 +66,43 @@ function serve(): ReturnType<typeof createServer> {
       res.writeHead(403).end();
       return;
     }
-    res.setHeader("Content-Type", mime[extname(file)] ?? "application/octet-stream");
+    res.setHeader(
+      "Content-Type",
+      mime[extname(file)] ?? "application/octet-stream",
+    );
     createReadStream(file)
       .on("error", () => res.writeHead(404).end("not found"))
       .pipe(res);
   });
 }
 
-// The overlay solves off a worker, so a fixed wait is more reliable here than
-// any DOM signal: give the labels time to appear and their fade to finish.
 function storyUrl(id: string): string {
   return `http://localhost:${port}/iframe.html?id=${id}&viewMode=story`;
+}
+
+// Determinism gate. The overlay solves off a worker and fades its labels in, so
+// a naive timed screenshot lands on a different frame every run — fatal for a CI
+// diff check. Wait for fonts, then poll the leader count until it stops changing:
+// that is the solve landing. `animations: "disabled"` at capture time then jumps
+// any in-flight transition to its end, so identical DOM yields identical bytes.
+async function settle(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+  const leaders = page.locator("#storybook-root svg path");
+  let previous = -1;
+  for (let poll = 0; poll < 50; poll++) {
+    const count = await leaders.count();
+    if (count > 0 && count === previous) {
+      return;
+    }
+    previous = count;
+    await page.waitForTimeout(120);
+  }
+}
+
+async function shoot(target: Locator): Promise<Buffer> {
+  return target.screenshot({ animations: "disabled" });
 }
 
 async function main(): Promise<void> {
@@ -80,7 +111,9 @@ async function main(): Promise<void> {
 
   const server = serve();
   await new Promise<void>((r) => server.listen(port, r));
-  const browser = await chromium.launch();
+  // --no-sandbox lets Chromium run as root inside the CI container; it has no
+  // effect on what gets rendered, so local and CI frames stay identical.
+  const browser = await chromium.launch({ args: ["--no-sandbox"] });
 
   try {
     await captureStills(browser);
@@ -92,58 +125,65 @@ async function main(): Promise<void> {
   console.log("done → assets/");
 }
 
-async function captureStills(browser: Awaited<ReturnType<typeof chromium.launch>>): Promise<void> {
+async function captureStills(browser: Browser): Promise<void> {
   const page = await browser.newPage({ deviceScaleFactor: stillScale });
   await page.setViewportSize({ width: 900, height: 720 });
   for (const { id, file } of stills) {
     await page.goto(storyUrl(id), { waitUntil: "networkidle" });
-    await page.waitForTimeout(1500);
-    await page.locator("#storybook-root").screenshot({ path: join(assetsDir, file) });
+    await settle(page);
+    await writeFile(
+      join(assetsDir, file),
+      await shoot(page.locator("#storybook-root")),
+    );
     console.log("still  →", file);
   }
   await page.close();
 }
 
-async function captureDeepDive(browser: Awaited<ReturnType<typeof chromium.launch>>): Promise<void> {
+// Each drill-down level held for `holdMs`, encoded as one settled frame. There
+// is no in-between animation to sample: capturing the fade would tie the frames
+// to wall-clock timing and break reproducibility, so the GIF is a clean
+// slideshow of the levels instead — click, land, hold, dive again.
+const dive = [
+  { hold: 1600 }, // outermost slots
+  { hold: 1800, into: "heading" }, // into the heading row
+  { hold: 1800, into: "text" }, // into the title/subtitle pair
+  { hold: 2000, into: "Card" }, // breadcrumb back to the top (root == story name)
+];
+
+async function captureDeepDive(browser: Browser): Promise<void> {
   const page = await browser.newPage({ deviceScaleFactor: gifScale });
   await page.setViewportSize({ width: 1100, height: 760 });
-  await page.goto(storyUrl("components-card--anatomy"), { waitUntil: "networkidle" });
-  await page.waitForTimeout(1200);
-
+  await page.goto(storyUrl("components-card--anatomy"), {
+    waitUntil: "networkidle",
+  });
   const root = page.locator("#storybook-root");
-  const frames: Buffer[] = [];
-  const frameGap = 90;
-  // Hold on the current view for `ms`, sampling a frame each ~90ms so the GIF
-  // captures the fade after a click, not just the endpoints.
-  const hold = async (ms: number): Promise<void> => {
-    for (let elapsed = 0; elapsed < ms; elapsed += frameGap) {
-      frames.push(await root.screenshot());
-      await page.waitForTimeout(frameGap);
-    }
-  };
-  const dive = async (name: string): Promise<void> => {
-    await page.getByRole("button", { name, exact: true }).first().click();
-  };
 
-  await hold(1100); // outermost slots
-  await dive("heading");
-  await hold(1400); // into the heading row
-  await dive("text");
-  await hold(1400); // into the title/subtitle pair
-  // The addon names the root breadcrumb after the story ("Components/Card").
-  await page.getByRole("button", { name: "Card", exact: true }).click();
-  await hold(1500); // back to the top
+  const frames: { buffer: Buffer; delayMs: number }[] = [];
+  for (const step of dive) {
+    if (step.into) {
+      await page
+        .getByRole("button", { name: step.into, exact: true })
+        .first()
+        .click();
+    }
+    await settle(page);
+    frames.push({ buffer: await shoot(root), delayMs: step.hold });
+  }
 
   await page.close();
   await encodeGif(frames, join(assetsDir, "deep-dive.gif"));
   console.log("gif    → deep-dive.gif", `(${frames.length} frames)`);
 }
 
-async function encodeGif(pngBuffers: Buffer[], out: string): Promise<void> {
+async function encodeGif(
+  frames: { buffer: Buffer; delayMs: number }[],
+  out: string,
+): Promise<void> {
   const gif = GIFEncoder();
   let width = 0;
   let height = 0;
-  for (const buffer of pngBuffers) {
+  for (const { buffer, delayMs } of frames) {
     const { data, width: w, height: h } = PNG.sync.read(buffer);
     // Frames can differ by a pixel as the breadcrumb text changes width; pin to
     // the first frame's size so every frame indexes the same canvas.
@@ -152,7 +192,7 @@ async function encodeGif(pngBuffers: Buffer[], out: string): Promise<void> {
     const rgba = sizeTo(data, w, h, width, height);
     const palette = quantize(rgba, 256);
     const index = applyPalette(rgba, palette);
-    gif.writeFrame(index, width, height, { palette, delay: 90 });
+    gif.writeFrame(index, width, height, { palette, delay: delayMs });
   }
   gif.finish();
   await writeFile(out, gif.bytes());

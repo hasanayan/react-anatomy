@@ -1,8 +1,33 @@
 import type { Region } from "./collect-regions";
 
-// The pure algebra over a collected region tree: identity, parent/child
-// navigation, and the Views cut from it. No DOM — `collectRegions` builds the
-// tree, everything here reasons about it.
+// The pure algebra over a collected region tree: identity, navigation, and the
+// Views cut from it. Makes no DOM *calls*, but threads each `Region`'s `el`
+// untouched; the handle is dropped only at `toZones` (solve/zones).
+
+// A total map over `keyof Region`: a new field fails the build until compared
+// here, so the gate can't drift from the shape it guards. `el` compares by
+// identity; `radii` per-corner (the `radius` shorthand collapses and misses it).
+const fieldComparators: {
+  [K in keyof Region]-?: (a: Region[K], b: Region[K]) => boolean;
+} = {
+  el: (a, b) => a === b,
+  name: (a, b) => a === b,
+  id: (a, b) => a === b,
+  depth: (a, b) => a === b,
+  parentId: (a, b) => a === b,
+  top: (a, b) => a === b,
+  left: (a, b) => a === b,
+  width: (a, b) => a === b,
+  height: (a, b) => a === b,
+  radius: (a, b) => a === b,
+  radii: (a, b) =>
+    a.topLeft === b.topLeft &&
+    a.topRight === b.topRight &&
+    a.bottomLeft === b.bottomLeft &&
+    a.bottomRight === b.bottomRight,
+};
+
+const regionFields = Object.keys(fieldComparators) as (keyof Region)[];
 
 // Compares `id`: navigation holds ids across renders, and a silent positional
 // shift would strand it. Keeps state identity stable to avoid a render loop.
@@ -16,17 +41,11 @@ export function regionsEqual(a: Region[], b: Region[]): boolean {
         return false;
       }
 
-      return (
-        region.el === other.el &&
-        region.name === other.name &&
-        region.id === other.id &&
-        region.depth === other.depth &&
-        region.parentId === other.parentId &&
-        region.top === other.top &&
-        region.left === other.left &&
-        region.width === other.width &&
-        region.height === other.height &&
-        region.radius === other.radius
+      return regionFields.every((key) =>
+        (fieldComparators[key] as (x: unknown, y: unknown) => boolean)(
+          region[key],
+          other[key],
+        ),
       );
     })
   );

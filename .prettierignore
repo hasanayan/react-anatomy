@@ -1,6 +1,7 @@
 **/dist/**
 **/storybook-static/**
 **/node_modules/**
+.pnpm-store/**
 pnpm-lock.yaml
 packages/core/docs/anatomy-glossary.svg
 scratchpad/**

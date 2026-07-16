@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { fitPadding } from "./gutters";
-import type { PlacedLabelData, Rect } from "./place-labels";
+import { anatomyConstants } from "../constants";
+import type { Rect, Zone } from "../geometry";
 
-describe("fitPadding", () => {
+import { fit, reserve } from "./gutters";
+import type { PlacedLabelData } from "./place-labels";
+import { placeZones } from "./place-labels";
+
+describe("fit", () => {
   // The content box every case measures overhang against.
   const content: Rect = { x: 0, y: 0, w: 200, h: 100 };
 
@@ -32,7 +36,7 @@ describe("fitPadding", () => {
       frames: [],
     };
 
-    expect(fitPadding(placement, content)).toStrictEqual({
+    expect(fit(placement, content)).toStrictEqual({
       top: 0,
       right: 0,
       bottom: 0,
@@ -57,15 +61,66 @@ describe("fitPadding", () => {
       frames: [],
     };
 
-    expect(fitPadding(placement, content).right).toBe(60);
+    expect(fit(placement, content).right).toBe(60);
   });
 
   it("reserves nothing for an empty placement", () => {
-    expect(fitPadding({ labels: [], frames: [] }, content)).toStrictEqual({
+    expect(fit({ labels: [] }, content)).toStrictEqual({
       top: 0,
       right: 0,
       bottom: 0,
       left: 0,
     });
   });
+});
+
+// The fitted gutter is only ever a tightening of the reserved one — the solve
+// clamps every label inside the reserve. If it fails, a fitted overlay crops.
+describe("reserve ≥ fit", () => {
+  const sides = ["top", "right", "bottom", "left"] as const;
+
+  const cases: {
+    name: string;
+    zones: Zone[];
+    labelSizes: Record<string, { w: number; h: number }>;
+  }[] = [
+    {
+      name: "two sibling leaves",
+      zones: [
+        { id: "a", rect: { x: 0, y: 0, w: 100, h: 40 }, depth: 1 },
+        { id: "b", rect: { x: 0, y: 60, w: 100, h: 40 }, depth: 1 },
+      ],
+      labelSizes: { a: { w: 60, h: 20 }, b: { w: 48, h: 20 } },
+    },
+    {
+      name: "a nested zone",
+      zones: [
+        { id: "outer", rect: { x: 0, y: 0, w: 160, h: 120 }, depth: 1 },
+        { id: "inner", rect: { x: 20, y: 20, w: 80, h: 40 }, depth: 2 },
+      ],
+      labelSizes: { outer: { w: 72, h: 20 }, inner: { w: 40, h: 20 } },
+    },
+  ];
+
+  it.each(cases)(
+    "the reserved gutter contains the fitted one ($name)",
+    ({ zones, labelSizes }) => {
+      const placement = placeZones(zones, labelSizes);
+
+      const left = Math.min(...zones.map((zone) => zone.rect.x));
+      const top = Math.min(...zones.map((zone) => zone.rect.y));
+      const right = Math.max(...zones.map((zone) => zone.rect.x + zone.rect.w));
+      const bottom = Math.max(
+        ...zones.map((zone) => zone.rect.y + zone.rect.h),
+      );
+      const frame: Rect = { x: left, y: top, w: right - left, h: bottom - top };
+
+      const fitted = fit(placement, frame);
+      const reserved = reserve(labelSizes, anatomyConstants);
+
+      for (const side of sides) {
+        expect(fitted[side]).toBeLessThanOrEqual(reserved[side]);
+      }
+    },
+  );
 });

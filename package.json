@@ -19,6 +19,7 @@
   },
   "scripts": {
     "assets": "node scripts/generate-assets.ts",
+    "assets:docker": "node scripts/generate-assets-docker.ts",
     "build": "pnpm --filter @react-anatomy/core build && pnpm --filter @react-anatomy/storybook build",
     "build:storybook": "pnpm --filter @react-anatomy/playground build",
     "lint": "pnpm run lint:check:eslint && pnpm run lint:check:prettier && pnpm run lint:check:knip && pnpm run lint:check:depcheck",
