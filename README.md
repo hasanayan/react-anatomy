@@ -72,8 +72,11 @@ function Card({ children }) {
 }
 ```
 
-Then set the `slotAnnotations` parameter on any story. `true` annotates the
-outermost slots; `boundary` outlines the component's own edge:
+Then set the `slotAnnotations` parameter on a story. On its own it opens on the
+outermost slots and lets the reader **drill in a level at a time** — click a part
+to dive into it, and the breadcrumb trail walks back out. Every level is
+re-labelled from scratch, leaders and all. `boundary` outlines the component's
+own edge:
 
 ```tsx
 export const Anatomy = {
@@ -82,8 +85,12 @@ export const Anatomy = {
 };
 ```
 
-That renders the diagram above. Set `depth` to `"all"` for the full tree at once
-— nested regions and all — laid out in the same non-crossing construction:
+<p align="center">
+  <img src="assets/deep-dive.gif" alt="Clicking into the card's heading, then into its text, then back out through the breadcrumb — each level re-labelled with non-crossing leaders" width="820" />
+</p>
+
+Pin a `depth` instead for a static diagram. `"all"` labels the full tree at once
+— nested regions and all — in the same non-crossing construction:
 
 ```tsx
 export const AnatomyAll = {

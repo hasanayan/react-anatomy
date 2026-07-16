@@ -1,0 +1,56 @@
+# PR gate: lint, typecheck, test, build, and prove the committed README assets
+# still match what `pnpm assets` produces. Asset generation drives a headless
+# Chromium, so it runs in the official Playwright container whose fonts and
+# browser build match the ones the committed assets were generated with — the
+# byte-for-byte diff check only holds when the render environment is pinned.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    steps:
+      - uses: actions/checkout@v4
+
+      # The container runs as root over a checkout git sees as another owner;
+      # without this the later `git diff` aborts on "dubious ownership".
+      - name: Trust the workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.8.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
+
+      - run: pnpm build
+
+      # Regenerate the README assets and fail if anything changed: a committed
+      # PNG/GIF is now stale relative to the stories that produce it.
+      - name: Generate assets
+        run: pnpm assets
+
+      - name: Assets are up to date
+        run: |
+          if ! git diff --quiet -- assets; then
+            echo "::error::Committed assets are stale. Run 'pnpm assets:docker' and commit the result."
+            git -c core.pager=cat diff --stat -- assets
+            exit 1
+          fi
