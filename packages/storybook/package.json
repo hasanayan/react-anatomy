@@ -1,6 +1,6 @@
 {
   "name": "@react-anatomy/storybook",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "type": "module",
   "description": "Storybook addon for @react-anatomy/core: a slotAnnotations story parameter that overlays anatomy labels, with the root breadcrumb derived from the story context.",
   "repository": {
